@@ -48,6 +48,30 @@ func AuthMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// validateToken validates a JWT token and extracts user info.
+func validateToken(token string) (string, string, error) {
+	secret := os.Getenv("JWT_SECRET")
+	if secret == "" {
+		return "", "", ErrMissingSecret
+	}
+
+	claims := &CustomClaims{}
+	parsed, err := jwt.ParseWithClaims(token, claims, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, ErrInvalidToken
+		}
+		return []byte(secret), nil
+	})
+	if err != nil || !parsed.Valid {
+		return "", "", ErrInvalidToken
+	}
+	if claims.Subject == "" {
+		return "", "", ErrInvalidToken
+	}
+
+	return claims.Subject, claims.Role, nil
+}
+
 // RoleMiddleware checks user role authorization
 func RoleMiddleware(allowedRoles ...string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -163,30 +187,6 @@ type CustomClaims struct {
 	jwt.RegisteredClaims
 }
 
-// validateToken validates a JWT token and extracts user info.
-func validateToken(token string) (string, string, error) {
-	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
-		return "", "", ErrMissingSecret
-	}
-
-	claims := &CustomClaims{}
-	parsed, err := jwt.ParseWithClaims(token, claims, func(t *jwt.Token) (interface{}, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, ErrInvalidToken
-		}
-		return []byte(secret), nil
-	})
-	if err != nil || !parsed.Valid {
-		return "", "", ErrInvalidToken
-	}
-	if claims.Subject == "" {
-		return "", "", ErrInvalidToken
-	}
-
-	return claims.Subject, claims.Role, nil
-}
-
 // getClientIP extracts client IP from request
 func getClientIP(r *http.Request) string {
 	// Check X-Forwarded-For header first (for proxied requests)
@@ -196,18 +196,4 @@ func getClientIP(r *http.Request) string {
 
 	// Falls back to RemoteAddr
 	return strings.Split(r.RemoteAddr, ":")[0]
-}
-
-// Custom errors
-var (
-	ErrInvalidToken  = &TokenError{message: "invalid token"}
-	ErrMissingSecret = &TokenError{message: "missing jwt secret"}
-)
-
-type TokenError struct {
-	message string
-}
-
-func (e *TokenError) Error() string {
-	return e.message
 }

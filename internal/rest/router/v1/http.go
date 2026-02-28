@@ -3,6 +3,7 @@ package v1
 import (
 	"net/http"
 
+	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/middleware"
 	analytics_handler "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/analytics/handler"
 	analytics_usecase "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/analytics/usecase"
 	auth_handler "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/auth/handler"
@@ -14,7 +15,6 @@ import (
 	event_handler "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/event/handler"
 	event_usecase "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/event/usecase"
 	health_handler "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/health/handler"
-	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/middleware"
 	profile_handler "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/profile/handler"
 	profile_usecase "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/profile/usecase"
 

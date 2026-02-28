@@ -5,13 +5,13 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/middleware"
 	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/persistence/db"
 	analytics_usecase "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/analytics/usecase"
 	auth_usecase "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/auth/usecase"
 	campaign_usecase "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/campaigns/usecase"
 	engagement_usecase "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/engagement/usecase"
 	event_usecase "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/event/usecase"
-	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/middleware"
 	profile_usecase "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/profile/usecase"
 	v1 "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/router/v1"
 )

@@ -8,20 +8,12 @@ import (
 	profile_usecase "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/profile/usecase"
 )
 
-// UserProfile represents user profile information
-type UserProfile struct {
+// UserProfileResponse represents user profile information
+type UserProfileResponse struct {
 	ID      string `json:"id"`
 	Name    string `json:"name"`
 	Email   string `json:"email"`
 	Role    string `json:"role"`
-	Bio     string `json:"bio"`
-	Phone   string `json:"phone"`
-	Picture string `json:"picture"`
-}
-
-// UpdateProfileRequest represents profile update input
-type UpdateProfileRequest struct {
-	Name    string `json:"name"`
 	Bio     string `json:"bio"`
 	Phone   string `json:"phone"`
 	Picture string `json:"picture"`
@@ -57,7 +49,7 @@ func (h *ProfileHandler) GetProfileHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	profile := UserProfile{
+	profile := UserProfileResponse{
 		ID:      user.ID,
 		Name:    user.Name,
 		Email:   user.Email,
@@ -101,7 +93,7 @@ func (h *ProfileHandler) UpdateProfileHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	profile := UserProfile{
+	profile := UserProfileResponse{
 		ID:      user.ID,
 		Name:    user.Name,
 		Email:   user.Email,

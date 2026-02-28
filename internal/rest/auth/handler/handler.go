@@ -8,26 +8,6 @@ import (
 	auth_usecase "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/auth/usecase"
 )
 
-// RegisterRequest represents user registration payload
-type RegisterRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	Name     string `json:"name"`
-	Role     string `json:"role"`
-}
-
-// LoginRequest represents user login payload
-type LoginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
-// AuthResponse represents auth response with token
-type AuthResponse struct {
-	Token string      `json:"token"`
-	User  interface{} `json:"user"`
-}
-
 // AuthHandler handles authentication requests
 type AuthHandler struct {
 	usecase *auth_usecase.AuthUseCase
@@ -50,13 +30,15 @@ func (h *AuthHandler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate input
+	//TODO: this should be handled using struct validations
 	if req.Email == "" || req.Password == "" || req.Name == "" {
 		http.Error(w, `{"error": "Email, password, and name are required"}`, http.StatusBadRequest)
 		return
 	}
-
-	// Call usecase
+	if req.Role != "admin" && req.Role != "marketer" && req.Role != "analyst" {
+		http.Error(w, `{"error": "Invalid role. Must be 'admin' or 'marketer' or analyst"}`, http.StatusBadRequest)
+		return
+	}
 	usecaseReq := auth_usecase.RegisterRequest{
 		Email:    req.Email,
 		Password: req.Password,

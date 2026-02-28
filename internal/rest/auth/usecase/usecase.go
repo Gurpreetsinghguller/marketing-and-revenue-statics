@@ -60,11 +60,11 @@ func (u *AuthUseCase) Register(ctx context.Context, req RegisterRequest) (*Regis
 		return nil, errors.New("email already exists")
 	}
 
-	// Create new user (in real app, use proper ID generation and password hashing)
+	//TODO: Password Hashing and ID generation
 	user := &domain.User{
-		ID:       fmt.Sprintf("user_%d", len([]int{})), // Simple ID generation, use UUID in production
+		ID:       fmt.Sprintf("user_%d", len([]int{})),
 		Email:    req.Email,
-		Password: req.Password, // Should be hashed in production
+		Password: req.Password,
 		Name:     req.Name,
 		Role:     domain.Role(req.Role),
 	}
