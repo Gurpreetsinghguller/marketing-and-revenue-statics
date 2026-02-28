@@ -1,0 +1,785 @@
+openapi: 3.0.3
+info:
+  title: Marketing and Revenue Statics API
+  version: 1.0.0
+  description: API for campaigns, analytics, events, profiles, and engagement.
+servers:
+  - url: http://localhost:8080/api/v1
+paths:
+  /health:
+    get:
+      summary: Health check
+      tags: [Health]
+      responses:
+        "200":
+          description: Service status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /auth/register:
+    post:
+      summary: Register a new user
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: User registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /auth/login:
+    post:
+      summary: Login a user
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /profile:
+    get:
+      summary: Get current user profile
+      tags: [Profile]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Profile details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      summary: Update current user profile
+      tags: [Profile]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        "200":
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /campaigns/preview/{id}:
+    get:
+      summary: Get public campaign preview
+      tags: [Campaigns]
+      parameters:
+        - $ref: "#/components/parameters/CampaignId"
+      responses:
+        "200":
+          description: Campaign details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Campaign"
+        "403":
+          description: Not public
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /campaigns:
+    get:
+      summary: List campaigns (filters optional)
+      tags: [Campaigns]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+        - in: query
+          name: channel
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Campaign list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Campaign"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: Create a campaign
+      tags: [Campaigns]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserRoleHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCampaignRequest"
+      responses:
+        "201":
+          description: Campaign created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Campaign"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /campaigns/{id}:
+    put:
+      summary: Update a campaign
+      tags: [Campaigns]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CampaignId"
+        - $ref: "#/components/parameters/UserRoleHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCampaignRequest"
+      responses:
+        "200":
+          description: Campaign updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Campaign"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      summary: Delete a campaign
+      tags: [Campaigns]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CampaignId"
+        - $ref: "#/components/parameters/UserRoleHeader"
+      responses:
+        "200":
+          description: Campaign deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /campaigns/search:
+    get:
+      summary: Search campaigns
+      tags: [Campaigns]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: q
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Campaign"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /events:
+    post:
+      summary: Track an event
+      tags: [Events]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrackEventRequest"
+      responses:
+        "201":
+          description: Event created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      summary: List events for user or by filters
+      tags: [Events]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: campaign_id
+          schema:
+            type: string
+        - in: query
+          name: event_type
+          schema:
+            type: string
+            enum: [impressions, clicks, conversions]
+      responses:
+        "200":
+          description: Event list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Event"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /analytics/public/stats:
+    get:
+      summary: Public campaign stats
+      tags: [Analytics]
+      responses:
+        "200":
+          description: Public stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicStats"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /analytics/reports:
+    get:
+      summary: Aggregated analytics report
+      tags: [Analytics]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsReport"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /analytics/reports/daily:
+    get:
+      summary: Daily report
+      tags: [Analytics]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: date
+          schema:
+            type: string
+            example: "2026-02-28"
+      responses:
+        "200":
+          description: Daily report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsReport"
+  /analytics/reports/weekly:
+    get:
+      summary: Weekly report
+      tags: [Analytics]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: week_start
+          schema:
+            type: string
+            example: "2026-02-24"
+      responses:
+        "200":
+          description: Weekly report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsReport"
+  /analytics/reports/monthly:
+    get:
+      summary: Monthly report
+      tags: [Analytics]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: month
+          schema:
+            type: string
+            example: "2026-02"
+      responses:
+        "200":
+          description: Monthly report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsReport"
+  /users/{user_id}/engagement:
+    get:
+      summary: User engagement summary
+      tags: [Engagement]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: Engagement summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserEngagement"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /users/{user_id}/campaigns/{campaign_id}/engagement:
+    get:
+      summary: User engagement for a campaign
+      tags: [Engagement]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+        - $ref: "#/components/parameters/CampaignIdPath"
+      responses:
+        "200":
+          description: Engagement details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserCampaignEngagement"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /campaigns/{campaign_id}/funnel:
+    get:
+      summary: Campaign funnel data
+      tags: [Engagement]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CampaignIdPath"
+      responses:
+        "200":
+          description: Funnel stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignFunnel"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    CampaignId:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+    CampaignIdPath:
+      in: path
+      name: campaign_id
+      required: true
+      schema:
+        type: string
+    UserId:
+      in: path
+      name: user_id
+      required: true
+      schema:
+        type: string
+    UserRoleHeader:
+      in: header
+      name: X-User-Role
+      required: false
+      schema:
+        type: string
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        time:
+          type: string
+          format: date-time
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+    RegisterRequest:
+      type: object
+      required: [email, password, name]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+        name:
+          type: string
+        role:
+          type: string
+          example: marketer
+    RegisterResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        user_id:
+          type: string
+        token:
+          type: string
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+    LoginResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        token:
+          type: string
+        user:
+          type: object
+          additionalProperties: true
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        bio:
+          type: string
+        phone:
+          type: string
+        picture:
+          type: string
+    UpdateProfileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        bio:
+          type: string
+        phone:
+          type: string
+        picture:
+          type: string
+    DateRange:
+      type: object
+      properties:
+        start:
+          type: string
+        end:
+          type: string
+    Campaign:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+        date_range:
+          $ref: "#/components/schemas/DateRange"
+        budget:
+          type: number
+          format: float
+        channel:
+          type: string
+        created_by:
+          type: string
+        is_public:
+          type: boolean
+    CreateCampaignRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+        date_range:
+          $ref: "#/components/schemas/DateRange"
+        budget:
+          type: number
+          format: float
+        channel:
+          type: string
+        is_public:
+          type: boolean
+    Event:
+      type: object
+      properties:
+        id:
+          type: string
+        campaign_id:
+          type: string
+        event_type:
+          type: string
+          enum: [impressions, clicks, conversions]
+        user_id:
+          type: string
+        timestamp:
+          type: string
+        metadata:
+          $ref: "#/components/schemas/EventMetadata"
+    EventMetadata:
+      type: object
+      properties:
+        amount:
+          type: number
+          format: float
+        source:
+          type: string
+        device:
+          type: string
+    TrackEventRequest:
+      type: object
+      required: [campaign_id, event_type]
+      properties:
+        campaign_id:
+          type: string
+        event_type:
+          type: string
+          enum: [impressions, clicks, conversions]
+        user_id:
+          type: string
+        timestamp:
+          type: string
+        metadata:
+          $ref: "#/components/schemas/EventMetadata"
+    PublicStats:
+      type: object
+      properties:
+        total_campaigns:
+          type: integer
+        campaigns:
+          type: array
+          items:
+            $ref: "#/components/schemas/Campaign"
+    AnalyticsReport:
+      type: object
+      additionalProperties: true
+    UserEngagement:
+      type: object
+      properties:
+        user_id:
+          type: string
+        total_interactions:
+          type: integer
+        total_duration:
+          type: integer
+        campaigns_engaged:
+          type: integer
+        average_engagement:
+          type: number
+          format: float
+        top_campaigns:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    UserCampaignEngagement:
+      type: object
+      properties:
+        user_id:
+          type: string
+        campaign_id:
+          type: string
+        interactions:
+          type: integer
+        duration:
+          type: integer
+        event_types:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    CampaignFunnel:
+      type: object
+      properties:
+        campaign_id:
+          type: string
+        impressions:
+          type: integer
+        clicks:
+          type: integer
+        conversions:
+          type: integer
+        conversion_rate:
+          type: number
+          format: float
+        dropoff_rate:
+          type: number
+          format: float

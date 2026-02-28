@@ -1,8 +1,11 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
+
+	auth_usecase "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/auth/usecase"
 )
 
 // RegisterRequest represents user registration payload
@@ -25,8 +28,20 @@ type AuthResponse struct {
 	User  interface{} `json:"user"`
 }
 
+// AuthHandler handles authentication requests
+type AuthHandler struct {
+	usecase *auth_usecase.AuthUseCase
+}
+
+// NewAuthHandler creates a new auth handler
+func NewAuthHandler(uc *auth_usecase.AuthUseCase) *AuthHandler {
+	return &AuthHandler{
+		usecase: uc,
+	}
+}
+
 // RegisterHandler handles user registration
-func RegisterHandler(w http.ResponseWriter, r *http.Request) {
+func (h *AuthHandler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	var req RegisterRequest
@@ -35,20 +50,38 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Validate email format
-	// TODO: Hash password
-	// TODO: Save user to persistence
-	// TODO: Generate JWT token
+	// Validate input
+	if req.Email == "" || req.Password == "" || req.Name == "" {
+		http.Error(w, `{"error": "Email, password, and name are required"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Call usecase
+	usecaseReq := auth_usecase.RegisterRequest{
+		Email:    req.Email,
+		Password: req.Password,
+		Name:     req.Name,
+		Role:     req.Role,
+	}
+
+	result, err := h.usecase.Register(context.Background(), usecaseReq)
+	if err != nil {
+		http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusBadRequest)
+		return
+	}
 
 	response := map[string]interface{}{
 		"message": "User registered successfully",
-		"token":   "jwt_token_here",
+		"user_id": result.UserID,
+		"token":   result.Token,
 	}
+
+	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(response)
 }
 
 // LoginHandler handles user login
-func LoginHandler(w http.ResponseWriter, r *http.Request) {
+func (h *AuthHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	var req LoginRequest
@@ -57,12 +90,29 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Validate credentials
-	// TODO: Generate JWT token
+	// Validate input
+	if req.Email == "" || req.Password == "" {
+		http.Error(w, `{"error": "Email and password are required"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Call usecase
+	usecaseReq := auth_usecase.LoginRequest{
+		Email:    req.Email,
+		Password: req.Password,
+	}
+
+	result, err := h.usecase.Login(context.Background(), usecaseReq)
+	if err != nil {
+		http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusUnauthorized)
+		return
+	}
 
 	response := map[string]interface{}{
 		"message": "Login successful",
-		"token":   "jwt_token_here",
+		"token":   result.Token,
+		"user":    result.User,
 	}
+
 	json.NewEncoder(w).Encode(response)
 }

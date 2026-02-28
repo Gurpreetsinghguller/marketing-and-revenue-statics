@@ -2,12 +2,19 @@ package v1
 
 import (
 	analytics_handler "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/analytics/handler"
+	analytics_usecase "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/analytics/usecase"
 	auth_handler "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/auth/handler"
+	auth_usecase "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/auth/usecase"
 	campaign_handler "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/campaigns/handler"
+	campaign_usecase "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/campaigns/usecase"
 	engagement_handler "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/engagement/handler"
+	engagement_usecase "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/engagement/usecase"
 	event_handler "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/event/handler"
+	event_usecase "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/event/usecase"
+	health_handler "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/health/handler"
 	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/middleware"
 	profile_handler "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/profile/handler"
+	profile_usecase "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/profile/usecase"
 
 	"github.com/gorilla/mux"
 )
@@ -24,75 +31,94 @@ func NewRouter() *Router {
 	}
 }
 
-// InitHTTPRoutes initializes all HTTP routes
-func (r *Router) InitHTTPRoutes() *mux.Router {
+// InitHTTPRoutes initializes all HTTP routes with handler instances
+func (r *Router) InitHTTPRoutes(
+	authUC *auth_usecase.AuthUseCase,
+	profileUC *profile_usecase.ProfileUseCase,
+	campaignUC *campaign_usecase.CampaignUseCase,
+	eventUC *event_usecase.EventUseCase,
+	analyticsUC *analytics_usecase.AnalyticsUseCase,
+	engagementUC *engagement_usecase.EngagementUseCase,
+) *mux.Router {
+	// Initialize handlers with their usecases
+	authHandler := auth_handler.NewAuthHandler(authUC)
+	profileHandler := profile_handler.NewProfileHandler(profileUC)
+	campaignHandler := campaign_handler.NewCampaignHandler(campaignUC)
+	eventHandler := event_handler.NewEventHandler(eventUC)
+	analyticsHandler := analytics_handler.NewAnalyticsHandler(analyticsUC)
+	engagementHandler := engagement_handler.NewEngagementHandler(engagementUC)
+	healthHandler := health_handler.NewHealthHandler()
+
 	v1 := r.router.PathPrefix("/api/v1").Subrouter()
+
+	// ============ Health Route ============
+	v1.HandleFunc("/health", healthHandler.GetHealthHandler).Methods("GET")
 
 	// ============ Auth Routes ============
 	auth := v1.PathPrefix("/auth").Subrouter()
-	auth.HandleFunc("/register", auth_handler.RegisterHandler).Methods("POST")
-	auth.HandleFunc("/login", auth_handler.LoginHandler).Methods("POST")
+	auth.HandleFunc("/register", authHandler.RegisterHandler).Methods("POST")
+	auth.HandleFunc("/login", authHandler.LoginHandler).Methods("POST")
 
 	// ============ Profile Routes ============
 	profile := v1.PathPrefix("/profile").Subrouter()
 	profile.Use(middleware.AuthMiddleware)
-	profile.HandleFunc("", profile_handler.GetProfileHandler).Methods("GET")
-	profile.HandleFunc("", profile_handler.UpdateProfileHandler).Methods("PUT")
+	profile.HandleFunc("", profileHandler.GetProfileHandler).Methods("GET")
+	profile.HandleFunc("", profileHandler.UpdateProfileHandler).Methods("PUT")
 
 	// ============ Campaign Routes ============
 	campaigns := v1.PathPrefix("/campaigns").Subrouter()
 
 	// Public campaign preview (no auth required)
-	campaigns.HandleFunc("/preview/{id}", campaign_handler.GetCampaignPreviewHandler).Methods("GET")
+	campaigns.HandleFunc("/preview/{id}", campaignHandler.GetCampaignPreviewHandler).Methods("GET")
 
 	// Authenticated campaign routes
 	campaignsAuth := campaigns.PathPrefix("").Subrouter()
 	campaignsAuth.Use(middleware.AuthMiddleware)
-	campaignsAuth.HandleFunc("", campaign_handler.GetCampaignsHandler).Methods("GET")
+	campaignsAuth.HandleFunc("", campaignHandler.GetCampaignsHandler).Methods("GET")
 
 	// Routes requiring Marketer or Admin role
 	campaignsAuthRole := campaignsAuth.PathPrefix("").Subrouter()
 	campaignsAuthRole.Use(middleware.RoleMiddleware("Marketer", "Admin"))
-	campaignsAuthRole.HandleFunc("", campaign_handler.CreateCampaignHandler).Methods("POST")
-	campaignsAuthRole.HandleFunc("/{id}", campaign_handler.UpdateCampaignHandler).Methods("PUT")
-	campaignsAuthRole.HandleFunc("/{id}", campaign_handler.DeleteCampaignHandler).Methods("DELETE")
+	campaignsAuthRole.HandleFunc("", campaignHandler.CreateCampaignHandler).Methods("POST")
+	campaignsAuthRole.HandleFunc("/{id}", campaignHandler.UpdateCampaignHandler).Methods("PUT")
+	campaignsAuthRole.HandleFunc("/{id}", campaignHandler.DeleteCampaignHandler).Methods("DELETE")
 
-	campaignsAuth.HandleFunc("/search", campaign_handler.SearchCampaignsHandler).Methods("GET")
+	campaignsAuth.HandleFunc("/search", campaignHandler.SearchCampaignsHandler).Methods("GET")
 
 	// ============ Event Tracking Routes ============
 	events := v1.PathPrefix("/events").Subrouter()
 	events.Use(middleware.RateLimitMiddleware)
-	events.HandleFunc("", event_handler.TrackEventHandler).Methods("POST")
+	events.HandleFunc("", eventHandler.TrackEventHandler).Methods("POST")
 
 	// Event logs (authenticated)
 	eventsAuth := events.PathPrefix("").Subrouter()
 	eventsAuth.Use(middleware.AuthMiddleware)
-	eventsAuth.HandleFunc("", event_handler.GetEventsHandler).Methods("GET")
+	eventsAuth.HandleFunc("", eventHandler.GetEventsHandler).Methods("GET")
 
 	// ============ Analytics & Reporting Routes ============
 	analytics := v1.PathPrefix("/analytics").Subrouter()
 
 	// Public stats (no auth required)
-	analytics.HandleFunc("/public/stats", analytics_handler.GetPublicStatsHandler).Methods("GET")
+	analytics.HandleFunc("/public/stats", analyticsHandler.GetPublicStatsHandler).Methods("GET")
 
 	// Authenticated analytics routes
 	analyticsAuth := analytics.PathPrefix("").Subrouter()
 	analyticsAuth.Use(middleware.AuthMiddleware)
-	analyticsAuth.HandleFunc("/reports", analytics_handler.GetAnalyticsReportHandler).Methods("GET")
-	analyticsAuth.HandleFunc("/reports/daily", analytics_handler.GetDailyReportHandler).Methods("GET")
-	analyticsAuth.HandleFunc("/reports/weekly", analytics_handler.GetWeeklyReportHandler).Methods("GET")
-	analyticsAuth.HandleFunc("/reports/monthly", analytics_handler.GetMonthlyReportHandler).Methods("GET")
+	analyticsAuth.HandleFunc("/reports", analyticsHandler.GetAnalyticsReportHandler).Methods("GET")
+	analyticsAuth.HandleFunc("/reports/daily", analyticsHandler.GetDailyReportHandler).Methods("GET")
+	analyticsAuth.HandleFunc("/reports/weekly", analyticsHandler.GetWeeklyReportHandler).Methods("GET")
+	analyticsAuth.HandleFunc("/reports/monthly", analyticsHandler.GetMonthlyReportHandler).Methods("GET")
 
 	// ============ User Engagement & Behavioral Data Routes ============
 	users := v1.PathPrefix("/users").Subrouter()
 	users.Use(middleware.AuthMiddleware)
-	users.HandleFunc("/{user_id}/engagement", engagement_handler.GetUserEngagementHandler).Methods("GET")
-	users.HandleFunc("/{user_id}/campaigns/{campaign_id}/engagement", engagement_handler.GetUserCampaignEngagementHandler).Methods("GET")
+	users.HandleFunc("/{user_id}/engagement", engagementHandler.GetUserEngagementHandler).Methods("GET")
+	users.HandleFunc("/{user_id}/campaigns/{campaign_id}/engagement", engagementHandler.GetUserCampaignEngagementHandler).Methods("GET")
 
 	// ============ Campaign Funnel Routes ============
 	campaignFunnel := v1.PathPrefix("/campaigns").Subrouter()
 	campaignFunnel.Use(middleware.AuthMiddleware)
-	campaignFunnel.HandleFunc("/{campaign_id}/funnel", engagement_handler.GetCampaignFunnelHandler).Methods("GET")
+	campaignFunnel.HandleFunc("/{campaign_id}/funnel", engagementHandler.GetCampaignFunnelHandler).Methods("GET")
 
 	return r.router
 }

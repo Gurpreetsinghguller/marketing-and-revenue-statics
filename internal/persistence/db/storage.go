@@ -36,6 +36,7 @@ type StorageMgr struct {
 	baseDir string
 }
 
+// Strategy 1: JSON file storage
 // NewStorageMgr creates a new storage manager
 func NewStorageMgr() *StorageMgr {
 	// Create data directory if it doesn't exist

@@ -1,8 +1,11 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
+
+	analytics_usecase "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/analytics/usecase"
 )
 
 // Metrics represents campaign metrics
@@ -26,62 +29,126 @@ type Report struct {
 	Metrics    Metrics `json:"metrics"`
 }
 
+// AnalyticsHandler handles analytics requests
+type AnalyticsHandler struct {
+	usecase *analytics_usecase.AnalyticsUseCase
+}
+
+// NewAnalyticsHandler creates a new analytics handler
+func NewAnalyticsHandler(uc *analytics_usecase.AnalyticsUseCase) *AnalyticsHandler {
+	return &AnalyticsHandler{
+		usecase: uc,
+	}
+}
+
 // GetAnalyticsReportHandler retrieves aggregated analytics report
-func GetAnalyticsReportHandler(w http.ResponseWriter, r *http.Request) {
+func (h *AnalyticsHandler) GetAnalyticsReportHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// TODO: Extract query params (campaign, event_type, date_range, channel)
-	// TODO: Check authorization (Marketer/Analyst/Admin)
-	// TODO: Aggregate metrics from EventLog
-	// TODO: Calculate CTR, CPC, ROI, Conversion Rate
-	// TODO: Apply role-based filtering
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		http.Error(w, `{"error": "User not authenticated"}`, http.StatusUnauthorized)
+		return
+	}
 
-	report := Report{}
+	// Call usecase
+	report, err := h.usecase.GetAnalyticsReport(context.Background())
+	if err != nil {
+		http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
+		return
+	}
+
 	json.NewEncoder(w).Encode(report)
 }
 
 // GetDailyReportHandler retrieves daily performance summary
-func GetDailyReportHandler(w http.ResponseWriter, r *http.Request) {
+func (h *AnalyticsHandler) GetDailyReportHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// TODO: Extract date from URL param
-	// TODO: Aggregate daily metrics
-	// TODO: Return daily report
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		http.Error(w, `{"error": "User not authenticated"}`, http.StatusUnauthorized)
+		return
+	}
 
-	report := Report{}
+	// Extract date from query params
+	date := r.URL.Query().Get("date")
+	if date == "" {
+		date = "today"
+	}
+
+	// Call usecase
+	report, err := h.usecase.GetDailyReport(context.Background(), date)
+	if err != nil {
+		http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
+		return
+	}
+
 	json.NewEncoder(w).Encode(report)
 }
 
 // GetWeeklyReportHandler retrieves weekly performance summary
-func GetWeeklyReportHandler(w http.ResponseWriter, r *http.Request) {
+func (h *AnalyticsHandler) GetWeeklyReportHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// TODO: Extract week from URL param
-	// TODO: Aggregate weekly metrics
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		http.Error(w, `{"error": "User not authenticated"}`, http.StatusUnauthorized)
+		return
+	}
 
-	report := Report{}
+	// Extract week from query params
+	weekStart := r.URL.Query().Get("week_start")
+	if weekStart == "" {
+		weekStart = "this_week"
+	}
+
+	// Call usecase
+	report, err := h.usecase.GetWeeklyReport(context.Background(), weekStart)
+	if err != nil {
+		http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
+		return
+	}
+
 	json.NewEncoder(w).Encode(report)
 }
 
 // GetMonthlyReportHandler retrieves monthly performance summary
-func GetMonthlyReportHandler(w http.ResponseWriter, r *http.Request) {
+func (h *AnalyticsHandler) GetMonthlyReportHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// TODO: Extract month from URL param
-	// TODO: Aggregate monthly metrics
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		http.Error(w, `{"error": "User not authenticated"}`, http.StatusUnauthorized)
+		return
+	}
 
-	report := Report{}
+	// Extract month from query params
+	month := r.URL.Query().Get("month")
+	if month == "" {
+		month = "this_month"
+	}
+
+	// Call usecase
+	report, err := h.usecase.GetMonthlyReport(context.Background(), month)
+	if err != nil {
+		http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
+		return
+	}
+
 	json.NewEncoder(w).Encode(report)
 }
 
 // GetPublicStatsHandler retrieves anonymized public campaign stats
-func GetPublicStatsHandler(w http.ResponseWriter, r *http.Request) {
+func (h *AnalyticsHandler) GetPublicStatsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// TODO: Fetch only public campaigns
-	// TODO: Return anonymized metrics
-	// TODO: No authentication required
+	// Call usecase (no auth required for public stats)
+	stats, err := h.usecase.GetPublicStats(context.Background())
+	if err != nil {
+		http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
+		return
+	}
 
-	stats := map[string]interface{}{}
 	json.NewEncoder(w).Encode(stats)
 }
