@@ -1,151 +1,198 @@
-package persistence
+package user
 
 import (
-	"math/rand"
+	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/domain"
+	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/persistence/db"
 )
 
-// UserRepository implements domain.UserRepo using JSON file storage
-type UserRepository struct {
-	storage *StorageMgr
-	users   []domain.User
+const userPrefix = "users"
+
+type userDBModel struct {
+	ID        string    `json:"id"`
+	Email     string    `json:"email"`
+	Password  string    `json:"password"`
+	Name      string    `json:"name"`
+	Role      string    `json:"role"`
+	Bio       string    `json:"bio"`
+	Phone     string    `json:"phone"`
+	Picture   string    `json:"picture"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// NewUserRepository creates a new user repository
-func NewUserRepository() *UserRepository {
-	repo := &UserRepository{
-		storage: NewStorageMgr(),
-		users:   []domain.User{},
+func toUserDBModel(u domain.User) userDBModel {
+	return userDBModel{
+		ID:        u.ID,
+		Email:     u.Email,
+		Password:  u.Password,
+		Name:      u.Name,
+		Role:      string(u.Role),
+		Bio:       u.Bio,
+		Phone:     u.Phone,
+		Picture:   u.Picture,
+		CreatedAt: u.CreatedAt,
+		UpdatedAt: u.UpdatedAt,
 	}
-	// Load existing users from file
-	repo.storage.ReadJSON(UsersFile, &repo.users)
-	return repo
 }
 
-// Create saves a new user
-func (r *UserRepository) Create(user *domain.User) error {
-	r.storage.mu.Lock()
-	defer r.storage.mu.Unlock()
+func (m userDBModel) toDomain() domain.User {
+	return domain.User{
+		ID:        m.ID,
+		Email:     m.Email,
+		Password:  m.Password,
+		Name:      m.Name,
+		Role:      domain.Role(m.Role),
+		Bio:       m.Bio,
+		Phone:     m.Phone,
+		Picture:   m.Picture,
+		CreatedAt: m.CreatedAt,
+		UpdatedAt: m.UpdatedAt,
+	}
+}
 
-	// Check if email already exists
-	for _, u := range r.users {
-		if u.Email == user.Email {
-			return ErrExists
+func decodeUserDBModel(value interface{}) (userDBModel, error) {
+	b, err := json.Marshal(value)
+	if err != nil {
+		return userDBModel{}, err
+	}
+	var model userDBModel
+	if err := json.Unmarshal(b, &model); err != nil {
+		return userDBModel{}, err
+	}
+	return model, nil
+}
+
+func userKey(id string) string {
+	return userPrefix + "/" + id
+}
+
+// UserRepository implements domain.UserRepo.
+type UserRepository struct {
+	storage db.PersistenceDB
+}
+
+// NewUserRepository creates a new user repository.
+func NewUserRepository(storage ...db.PersistenceDB) *UserRepository {
+	selected := db.PersistenceDB(db.NewStorageMgr())
+	if len(storage) > 0 && storage[0] != nil {
+		selected = storage[0]
+	}
+	return &UserRepository{storage: selected}
+}
+
+func (r *UserRepository) getAll() ([]domain.User, error) {
+	stored, err := r.storage.List(context.Background(), userPrefix)
+	if err != nil {
+		return nil, err
+	}
+
+	users := make([]domain.User, 0, len(stored))
+	for _, item := range stored {
+		model, err := decodeUserDBModel(item)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, model.toDomain())
+	}
+
+	return users, nil
+}
+
+// Create saves a new user.
+func (r *UserRepository) Create(user *domain.User) error {
+	if r.EmailExists(user.Email) {
+		return db.ErrExists
+	}
+
+	if user.ID == "" {
+		user.ID = db.GenerateID("user")
+	}
+
+	now := time.Now()
+	user.CreatedAt = now
+	user.UpdatedAt = now
+
+	return r.storage.Create(context.Background(), userKey(user.ID), toUserDBModel(*user))
+}
+
+// GetByID retrieves a user by ID.
+func (r *UserRepository) GetByID(id string) (*domain.User, error) {
+	stored, err := r.storage.Read(context.Background(), userKey(id))
+	if err != nil {
+		return nil, err
+	}
+
+	model, err := decodeUserDBModel(stored)
+	if err != nil {
+		return nil, err
+	}
+
+	entity := model.toDomain()
+	return &entity, nil
+}
+
+// GetByEmail retrieves a user by email.
+func (r *UserRepository) GetByEmail(email string) (*domain.User, error) {
+	users, err := r.getAll()
+	if err != nil {
+		return nil, err
+	}
+	for i := range users {
+		if users[i].Email == email {
+			return &users[i], nil
 		}
 	}
+	return nil, db.ErrNotFound
+}
 
-	// Generate ID if not provided
-	if user.ID == "" {
-		user.ID = "user_" + generateRandomString(12)
+// Update updates an existing user.
+func (r *UserRepository) Update(user *domain.User) error {
+	existing, err := r.GetByID(user.ID)
+	if err != nil {
+		return err
 	}
 
-	user.CreatedAt = time.Now()
+	if user.CreatedAt.IsZero() {
+		user.CreatedAt = existing.CreatedAt
+	}
 	user.UpdatedAt = time.Now()
 
-	r.users = append(r.users, *user)
-
-	return r.storage.WriteJSON(UsersFile, r.users)
+	return r.storage.Update(context.Background(), userKey(user.ID), toUserDBModel(*user))
 }
 
-// GetByID retrieves a user by ID
-func (r *UserRepository) GetByID(id string) (*domain.User, error) {
-	r.storage.mu.RLock()
-	defer r.storage.mu.RUnlock()
-
-	for i := range r.users {
-		if r.users[i].ID == id {
-			return &r.users[i], nil
-		}
-	}
-	return nil, ErrNotFound
-}
-
-// GetByEmail retrieves a user by email
-func (r *UserRepository) GetByEmail(email string) (*domain.User, error) {
-	r.storage.mu.RLock()
-	defer r.storage.mu.RUnlock()
-
-	for i := range r.users {
-		if r.users[i].Email == email {
-			return &r.users[i], nil
-		}
-	}
-	return nil, ErrNotFound
-}
-
-// Update updates an existing user
-func (r *UserRepository) Update(user *domain.User) error {
-	r.storage.mu.Lock()
-	defer r.storage.mu.Unlock()
-
-	for i := range r.users {
-		if r.users[i].ID == user.ID {
-			user.UpdatedAt = time.Now()
-			r.users[i] = *user
-			return r.storage.WriteJSON(UsersFile, r.users)
-		}
-	}
-	return ErrNotFound
-}
-
-// Delete removes a user
+// Delete removes a user.
 func (r *UserRepository) Delete(id string) error {
-	r.storage.mu.Lock()
-	defer r.storage.mu.Unlock()
-
-	for i := range r.users {
-		if r.users[i].ID == id {
-			r.users = append(r.users[:i], r.users[i+1:]...)
-			return r.storage.WriteJSON(UsersFile, r.users)
-		}
-	}
-	return ErrNotFound
+	return r.storage.Delete(context.Background(), userKey(id))
 }
 
-// GetAll retrieves all users
+// GetAll retrieves all users.
 func (r *UserRepository) GetAll() ([]domain.User, error) {
-	r.storage.mu.RLock()
-	defer r.storage.mu.RUnlock()
-
-	return r.users, nil
+	return r.getAll()
 }
 
-// GetByRole retrieves users by role
+// GetByRole retrieves users by role.
 func (r *UserRepository) GetByRole(role string) ([]domain.User, error) {
-	r.storage.mu.RLock()
-	defer r.storage.mu.RUnlock()
+	users, err := r.getAll()
+	if err != nil {
+		return nil, err
+	}
 
-	var result []domain.User
-	for i := range r.users {
-		if string(r.users[i].Role) == role {
-			result = append(result, r.users[i])
+	result := make([]domain.User, 0)
+	for i := range users {
+		if string(users[i].Role) == role {
+			result = append(result, users[i])
 		}
 	}
+
 	return result, nil
 }
 
-// EmailExists checks if email already exists
+// EmailExists checks if email already exists.
 func (r *UserRepository) EmailExists(email string) bool {
-	r.storage.mu.RLock()
-	defer r.storage.mu.RUnlock()
-
-	for _, u := range r.users {
-		if u.Email == email {
-			return true
-		}
-	}
-	return false
-}
-
-// Helper function to generate random string
-func generateRandomString(length int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	b := make([]byte, length)
-	rand.Seed(time.Now().UnixNano())
-	for i := range b {
-		b[i] = charset[rand.Intn(len(charset))]
-	}
-	return string(b)
+	_, err := r.GetByEmail(email)
+	return err == nil
 }

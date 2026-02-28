@@ -1,6 +1,8 @@
 package campaign
 
 import (
+	"context"
+	"encoding/json"
 	"strings"
 	"time"
 
@@ -8,67 +10,145 @@ import (
 	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/persistence/db"
 )
 
+const campaignPrefix = "campaigns"
+
+type campaignDBDateRange struct {
+	Start string `json:"start"`
+	End   string `json:"end"`
+}
+
+type campaignDBModel struct {
+	ID          string              `json:"id"`
+	Name        string              `json:"name"`
+	Description string              `json:"description"`
+	Status      string              `json:"status"`
+	DateRange   campaignDBDateRange `json:"date_range"`
+	Budget      float64             `json:"budget"`
+	Channel     string              `json:"channel"`
+	CreatedBy   string              `json:"created_by"`
+	IsPublic    bool                `json:"is_public"`
+}
+
+func toCampaignDBModel(c domain.Campaign) campaignDBModel {
+	return campaignDBModel{
+		ID:          c.ID,
+		Name:        c.Name,
+		Description: c.Description,
+		Status:      c.Status,
+		DateRange: campaignDBDateRange{
+			Start: c.DateRange.Start,
+			End:   c.DateRange.End,
+		},
+		Budget:    c.Budget,
+		Channel:   c.Channel,
+		CreatedBy: c.CreatedBy,
+		IsPublic:  c.IsPublic,
+	}
+}
+
+func (m campaignDBModel) toDomain() domain.Campaign {
+	return domain.Campaign{
+		ID:          m.ID,
+		Name:        m.Name,
+		Description: m.Description,
+		Status:      m.Status,
+		DateRange: domain.DateRange{
+			Start: m.DateRange.Start,
+			End:   m.DateRange.End,
+		},
+		Budget:    m.Budget,
+		Channel:   m.Channel,
+		CreatedBy: m.CreatedBy,
+		IsPublic:  m.IsPublic,
+	}
+}
+
+func decodeCampaignDBModel(value interface{}) (campaignDBModel, error) {
+	b, err := json.Marshal(value)
+	if err != nil {
+		return campaignDBModel{}, err
+	}
+	var model campaignDBModel
+	if err := json.Unmarshal(b, &model); err != nil {
+		return campaignDBModel{}, err
+	}
+	return model, nil
+}
+
+func campaignKey(id string) string {
+	return campaignPrefix + "/" + id
+}
+
 // CampaignRepository implements domain.CampaignRepo using JSON file storage
 type CampaignRepository struct {
-	storage   *db.StorageMgr
-	campaigns []domain.Campaign
+	storage db.PersistenceDB
 }
 
 // NewCampaignRepository creates a new campaign repository
-func NewCampaignRepository() *CampaignRepository {
-	repo := &CampaignRepository{
-		storage:   db.NewStorageMgr(),
-		campaigns: []domain.Campaign{},
+func NewCampaignRepository(storage ...db.PersistenceDB) *CampaignRepository {
+	selected := db.PersistenceDB(db.NewStorageMgr())
+	if len(storage) > 0 && storage[0] != nil {
+		selected = storage[0]
 	}
-	// Load existing campaigns from file
-	repo.storage.ReadJSON(db.CampaignsFile, &repo.campaigns)
-	return repo
+	return &CampaignRepository{storage: selected}
 }
 
 // Create saves a new campaign
 func (r *CampaignRepository) Create(campaign *domain.Campaign) error {
-	r.storage.mu.Lock()
-	defer r.storage.mu.Unlock()
-
 	// Generate ID if not provided
 	if campaign.ID == "" {
-		campaign.ID = "camp_" + generateRandomString(12)
+		campaign.ID = db.GenerateID("camp")
 	}
 
-	r.campaigns = append(r.campaigns, *campaign)
-	return r.storage.WriteJSON(CampaignsFile, r.campaigns)
+	return r.storage.Create(context.Background(), campaignKey(campaign.ID), toCampaignDBModel(*campaign))
 }
 
 // GetByID retrieves a campaign by ID
 func (r *CampaignRepository) GetByID(id string) (*domain.Campaign, error) {
-	r.storage.mu.RLock()
-	defer r.storage.mu.RUnlock()
-
-	for i := range r.campaigns {
-		if r.campaigns[i].ID == id {
-			return &r.campaigns[i], nil
-		}
+	stored, err := r.storage.Read(context.Background(), campaignKey(id))
+	if err != nil {
+		return nil, err
 	}
-	return nil, ErrNotFound
+
+	model, err := decodeCampaignDBModel(stored)
+	if err != nil {
+		return nil, err
+	}
+
+	entity := model.toDomain()
+	return &entity, nil
 }
 
 // GetAll retrieves all campaigns
 func (r *CampaignRepository) GetAll() ([]domain.Campaign, error) {
-	r.storage.mu.RLock()
-	defer r.storage.mu.RUnlock()
+	stored, err := r.storage.List(context.Background(), campaignPrefix)
+	if err != nil {
+		return nil, err
+	}
 
-	return r.campaigns, nil
+	result := make([]domain.Campaign, 0, len(stored))
+	for _, item := range stored {
+		model, err := decodeCampaignDBModel(item)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, model.toDomain())
+	}
+
+	return result, nil
 }
 
 // GetByStatus retrieves campaigns by status
 func (r *CampaignRepository) GetByStatus(status string) ([]domain.Campaign, error) {
-	r.storage.mu.RLock()
-	defer r.storage.mu.RUnlock()
+	all, err := r.GetAll()
+	if err != nil {
+		return nil, err
+	}
 
 	var result []domain.Campaign
-	for i := range r.campaigns {
-		if r.campaigns[i].Status == status {
-			result = append(result, r.campaigns[i])
+	for i := range all {
+		if all[i].Status == status {
+			result = append(result, all[i])
 		}
 	}
 	return result, nil
@@ -76,13 +156,15 @@ func (r *CampaignRepository) GetByStatus(status string) ([]domain.Campaign, erro
 
 // GetByCreatedBy retrieves campaigns created by a user
 func (r *CampaignRepository) GetByCreatedBy(userID string) ([]domain.Campaign, error) {
-	r.storage.mu.RLock()
-	defer r.storage.mu.RUnlock()
+	all, err := r.GetAll()
+	if err != nil {
+		return nil, err
+	}
 
 	var result []domain.Campaign
-	for i := range r.campaigns {
-		if r.campaigns[i].CreatedBy == userID {
-			result = append(result, r.campaigns[i])
+	for i := range all {
+		if all[i].CreatedBy == userID {
+			result = append(result, all[i])
 		}
 	}
 	return result, nil
@@ -90,13 +172,15 @@ func (r *CampaignRepository) GetByCreatedBy(userID string) ([]domain.Campaign, e
 
 // GetByChannel retrieves campaigns by channel
 func (r *CampaignRepository) GetByChannel(channel string) ([]domain.Campaign, error) {
-	r.storage.mu.RLock()
-	defer r.storage.mu.RUnlock()
+	all, err := r.GetAll()
+	if err != nil {
+		return nil, err
+	}
 
 	var result []domain.Campaign
-	for i := range r.campaigns {
-		if r.campaigns[i].Channel == channel {
-			result = append(result, r.campaigns[i])
+	for i := range all {
+		if all[i].Channel == channel {
+			result = append(result, all[i])
 		}
 	}
 	return result, nil
@@ -104,13 +188,15 @@ func (r *CampaignRepository) GetByChannel(channel string) ([]domain.Campaign, er
 
 // GetPublic retrieves all public campaigns
 func (r *CampaignRepository) GetPublic() ([]domain.Campaign, error) {
-	r.storage.mu.RLock()
-	defer r.storage.mu.RUnlock()
+	all, err := r.GetAll()
+	if err != nil {
+		return nil, err
+	}
 
 	var result []domain.Campaign
-	for i := range r.campaigns {
-		if r.campaigns[i].IsPublic {
-			result = append(result, r.campaigns[i])
+	for i := range all {
+		if all[i].IsPublic {
+			result = append(result, all[i])
 		}
 	}
 	return result, nil
@@ -118,20 +204,22 @@ func (r *CampaignRepository) GetPublic() ([]domain.Campaign, error) {
 
 // GetByDateRange retrieves campaigns within a date range
 func (r *CampaignRepository) GetByDateRange(startDate, endDate string) ([]domain.Campaign, error) {
-	r.storage.mu.RLock()
-	defer r.storage.mu.RUnlock()
+	all, err := r.GetAll()
+	if err != nil {
+		return nil, err
+	}
 
 	start, _ := time.Parse("2006-01-02", startDate)
 	end, _ := time.Parse("2006-01-02", endDate)
 
 	var result []domain.Campaign
-	for i := range r.campaigns {
-		campaignStart, _ := time.Parse("2006-01-02", r.campaigns[i].DateRange.Start)
-		campaignEnd, _ := time.Parse("2006-01-02", r.campaigns[i].DateRange.End)
+	for i := range all {
+		campaignStart, _ := time.Parse("2006-01-02", all[i].DateRange.Start)
+		campaignEnd, _ := time.Parse("2006-01-02", all[i].DateRange.End)
 
 		// Check overlap
 		if campaignStart.Before(end) && campaignEnd.After(start) {
-			result = append(result, r.campaigns[i])
+			result = append(result, all[i])
 		}
 	}
 	return result, nil
@@ -139,43 +227,31 @@ func (r *CampaignRepository) GetByDateRange(startDate, endDate string) ([]domain
 
 // Update updates a campaign
 func (r *CampaignRepository) Update(campaign *domain.Campaign) error {
-	r.storage.mu.Lock()
-	defer r.storage.mu.Unlock()
-
-	for i := range r.campaigns {
-		if r.campaigns[i].ID == campaign.ID {
-			r.campaigns[i] = *campaign
-			return r.storage.WriteJSON(CampaignsFile, r.campaigns)
-		}
+	if _, err := r.storage.Read(context.Background(), campaignKey(campaign.ID)); err != nil {
+		return err
 	}
-	return ErrNotFound
+
+	return r.storage.Update(context.Background(), campaignKey(campaign.ID), toCampaignDBModel(*campaign))
 }
 
 // Delete removes a campaign
 func (r *CampaignRepository) Delete(id string) error {
-	r.storage.mu.Lock()
-	defer r.storage.mu.Unlock()
-
-	for i := range r.campaigns {
-		if r.campaigns[i].ID == id {
-			r.campaigns = append(r.campaigns[:i], r.campaigns[i+1:]...)
-			return r.storage.WriteJSON(CampaignsFile, r.campaigns)
-		}
-	}
-	return ErrNotFound
+	return r.storage.Delete(context.Background(), campaignKey(id))
 }
 
 // Search searches campaigns by name or description
 func (r *CampaignRepository) Search(query string) ([]domain.Campaign, error) {
-	r.storage.mu.RLock()
-	defer r.storage.mu.RUnlock()
+	all, err := r.GetAll()
+	if err != nil {
+		return nil, err
+	}
 
 	query = strings.ToLower(query)
 	var result []domain.Campaign
-	for i := range r.campaigns {
-		if strings.Contains(strings.ToLower(r.campaigns[i].Name), query) ||
-			strings.Contains(strings.ToLower(r.campaigns[i].Description), query) {
-			result = append(result, r.campaigns[i])
+	for i := range all {
+		if strings.Contains(strings.ToLower(all[i].Name), query) ||
+			strings.Contains(strings.ToLower(all[i].Description), query) {
+			result = append(result, all[i])
 		}
 	}
 	return result, nil
@@ -183,13 +259,15 @@ func (r *CampaignRepository) Search(query string) ([]domain.Campaign, error) {
 
 // GetWithFilters retrieves campaigns with multiple filters
 func (r *CampaignRepository) GetWithFilters(filters map[string]interface{}) ([]domain.Campaign, error) {
-	r.storage.mu.RLock()
-	defer r.storage.mu.RUnlock()
+	all, err := r.GetAll()
+	if err != nil {
+		return nil, err
+	}
 
 	var result []domain.Campaign
 
-	for i := range r.campaigns {
-		campaign := r.campaigns[i]
+	for i := range all {
+		campaign := all[i]
 		match := true
 
 		// Apply filters
