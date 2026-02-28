@@ -47,7 +47,9 @@ func main() {
 	// Start HTTP server
 	port := ":8080"
 	fmt.Printf("Server starting on http://localhost%s\n", port)
-	fmt.Println("API Documentation available at: http://localhost:8080/api/v1")
+	fmt.Println("Health check:        http://localhost:8080/api/v1/health")
+	fmt.Println("OpenAPI spec:        http://localhost:8080/api/v1/docs")
+	fmt.Println("Example endpoint:    http://localhost:8080/api/v1/auth/register")
 
 	if err := http.ListenAndServe(port, muxRouter); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("Server error: %v", err)

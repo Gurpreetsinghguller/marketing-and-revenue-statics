@@ -32,7 +32,9 @@ go run ./cmd/statistics
 
 The API is available at:
 ```
-http://localhost:8080/api/v1
+http://localhost:8080/api/v1/health        (Health check)
+http://localhost:8080/api/v1/docs          (OpenAPI spec)
+http://localhost:8080/api/v1/auth/register (Example endpoint)
 ```
 
 ### Generate a JWT Token for Testing
@@ -59,4 +61,4 @@ go build -o bin/tokengen ./cmd/tokengen
 ```
 
 ### OpenAPI Spec
-Import [openapi.yaml](openapi.yaml) into Postman to generate requests for all endpoints.
+The OpenAPI spec is served at `http://localhost:8080/api/v1/docs` when the server is running, or import [api/openapi.yaml](api/openapi.yaml) into Postman to generate requests for all endpoints.

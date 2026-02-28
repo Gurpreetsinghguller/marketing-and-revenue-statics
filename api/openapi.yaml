@@ -17,6 +17,17 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /docs:
+    get:
+      summary: Get OpenAPI specification
+      tags: [Health]
+      responses:
+        "200":
+          description: OpenAPI spec (YAML)
+          content:
+            application/x-yaml:
+              schema:
+                type: string
   /auth/register:
     post:
       summary: Register a new user

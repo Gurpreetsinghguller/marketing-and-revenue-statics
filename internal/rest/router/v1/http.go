@@ -1,6 +1,8 @@
 package v1
 
 import (
+	"net/http"
+
 	analytics_handler "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/analytics/handler"
 	analytics_usecase "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/analytics/usecase"
 	auth_handler "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/auth/handler"
@@ -53,6 +55,11 @@ func (r *Router) InitHTTPRoutes(
 
 	// ============ Health Route ============
 	v1.HandleFunc("/health", healthHandler.GetHealthHandler).Methods("GET")
+
+	// ============ OpenAPI Spec Route ============
+	v1.HandleFunc("/docs", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "api/openapi.yaml")
+	}).Methods("GET")
 
 	// ============ Auth Routes ============
 	auth := v1.PathPrefix("/auth").Subrouter()
