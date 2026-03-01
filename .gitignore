@@ -1,3 +1,6 @@
 shared/
-data/
-config/
+shared/
+data/*
+config/config.yml
+shared/secret
+*.json
