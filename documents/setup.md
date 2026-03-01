@@ -35,17 +35,17 @@ Create or update [config/config.yml](config/config.yml):
 
 ```yaml
 server:
-	port: "8080"
+    port: "8080"
 
 log:
-	level: "info"
+    level: "info"
 
 auth:
-	secret_file: "shared/secret"
+    secret_file: "shared/secret"
 
 rate_limit:
-	max_requests: 100
-	window_seconds: 60
+    max_requests: 100
+    window_seconds: 60
 ```
 
 ### Run the API Server
