@@ -1,49 +1,10 @@
-HTTP Request → Router → Middleware → Handler → UseCase → Database
-                                                  ↑
-                              (business logic & DB operations)
+## Architecture
 
 
-                              1. Usecase Layer (Core Business Logic)
-Implemented 6 usecase packages with database abstraction:
+- We have used domain driven design so that your core logic should revolve around the domain.
 
-usecase.go - User registration, login, token verification
-usecase.go - CRUD operations for campaigns with filtering
-usecase.go - User profile management
-usecase.go - Event tracking and aggregation
-usecase.go - Analytics reports and metrics calculation
-usecase.go - User engagement and funnel analysis
-2. Handler Layer (HTTP Request Processing)
-Implemented 6 handler packages that call usecase methods:
+- We have used layered architecture to separate concerns and improve maintainability. The layers are as follows:
 
-handler.go - RegisterHandler, LoginHandler with validation
-handler.go - CRUD handlers with query filtering & pagination
-handler.go - Profile GET/UPDATE handlers
-handler.go - Event tracking & retrieval handlers
-handler.go - Report generation handlers
-handler.go - Engagement & funnel handlers
-3. Middleware Layer (Cross-cutting Concerns)
-Fully implemented in middleware.go:
-
-AuthMiddleware - JWT token validation & user context extraction
-RoleMiddleware - Role-based access control (Admin, Marketer, Analyst)
-RateLimitMiddleware - Request rate limiting per user/IP
-CORSMiddleware - Cross-origin resource sharing
-LoggingMiddleware - Request/response logging
-Key Design Decisions:
-✅ Handler decoupling from DB - Handlers call usecase methods, not DB directly
-✅ Consistent error handling - Proper HTTP status codes and error messages
-✅ Context-based user info - User ID passed through request context and headers
-✅ Input validation - Validation in both handlers and usecases
-✅ Flexible filtering - Query parameters for filtering in GET operations
-✅ Authorization checks - Both authentication and authorization middleware in place
-
-No Breaking Changes:
-All changes are backward compatible with the existing router structure in http.go. The router already imports all handlers and middleware.
-
-
-
-
-----------------------------
  Layered Architecture (Decomposition) 
 HTTP Request
     ↓
@@ -52,3 +13,18 @@ Handler Layer (Presentation)
 UseCase Layer (Business Logic)
     ↓
 Persistence Layer (Data Access)
+
+
+## SOLID Principles
+
+We adhere to the following SOLID principles in our architecture:
+
+- **Single Responsibility Principle**: Each class and module has a single, well-defined responsibility.
+- **Open/Closed Principle**: Our code is open for extension but closed for modification.
+- **Liskov Substitution Principle**: Subtypes are substitutable for their base types without breaking functionality.
+- **Interface Segregation Principle**: Clients depend on specific, focused interfaces rather than broad ones.
+- **Dependency Injection**: Dependencies are injected rather than created internally, promoting loose coupling and testability.
+
+## Onion Architecture
+
+We have adopted Onion Architecture (also known as Ports and Adapters) to ensure our domain logic remains independent of external concerns. This approach places the domain model at the core, surrounded by application services, followed by infrastructure and presentation layers. This inversion of dependencies ensures that external frameworks and technologies depend on our business logic, not vice versa.
