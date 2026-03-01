@@ -5,19 +5,9 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/domain"
 	profile_usecase "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/profile/usecase"
 )
-
-// UserProfileResponse represents user profile information
-type UserProfileResponse struct {
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	Email   string `json:"email"`
-	Role    string `json:"role"`
-	Bio     string `json:"bio"`
-	Phone   string `json:"phone"`
-	Picture string `json:"picture"`
-}
 
 // ProfileHandler handles profile requests
 type ProfileHandler struct {
@@ -80,14 +70,14 @@ func (h *ProfileHandler) UpdateProfileHandler(w http.ResponseWriter, r *http.Req
 	}
 
 	// Call usecase
-	usecaseReq := profile_usecase.UpdateProfileRequest{
+	updates := &domain.User{
 		Name:    req.Name,
 		Bio:     req.Bio,
 		Phone:   req.Phone,
 		Picture: req.Picture,
 	}
 
-	user, err := h.usecase.UpdateProfile(context.Background(), userID, usecaseReq)
+	user, err := h.usecase.UpdateProfile(context.Background(), userID, updates)
 	if err != nil {
 		http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
 		return

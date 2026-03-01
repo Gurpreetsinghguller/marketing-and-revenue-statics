@@ -6,75 +6,51 @@ import (
 	"fmt"
 
 	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/domain"
-	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/persistence/db"
 )
 
 // EventUseCase handles event tracking business logic
 type EventUseCase struct {
-	db db.PersistenceDB
+	eventRepo domain.EventRepo
 }
 
 // NewEventUseCase creates a new event usecase
-func NewEventUseCase(db db.PersistenceDB) *EventUseCase {
+func NewEventUseCase(eventRepo domain.EventRepo) *EventUseCase {
 	return &EventUseCase{
-		db: db,
+		eventRepo: eventRepo,
 	}
 }
 
-// CreateEventRequest represents event creation input
-type CreateEventRequest struct {
-	CampaignID string
-	UserID     string
-	EventType  domain.EventType
-	Timestamp  string
-	Metadata   domain.Metadata
-}
+func (e *EventUseCase) TrackEvent(ctx context.Context, event *domain.Event) (*domain.Event, error) {
+	if event == nil {
+		return nil, errors.New("event is required")
+	}
 
-// TrackEvent creates a new event
-func (e *EventUseCase) TrackEvent(ctx context.Context, req CreateEventRequest) (*domain.Event, error) {
-	if req.CampaignID == "" || req.EventType == "" {
+	if event.CampaignID == "" || event.EventType == "" {
 		return nil, errors.New("campaign_id and event_type are required")
 	}
 
-	event := &domain.Event{
-		ID:         fmt.Sprintf("event_%d", len([]int{})), // Use UUID in production
-		CampaignID: req.CampaignID,
-		UserID:     req.UserID,
-		EventType:  req.EventType,
-		Timestamp:  req.Timestamp,
-		Metadata:   req.Metadata,
+	newEvent := &domain.Event{
+		CampaignID: event.CampaignID,
+		UserID:     event.UserID,
+		EventType:  event.EventType,
+		Timestamp:  event.Timestamp,
+		Metadata:   event.Metadata,
 	}
 
-	// Save event
-	key := fmt.Sprintf("event:%s", event.ID)
-	if err := e.db.Create(ctx, key, event); err != nil {
+	if err := e.eventRepo.Create(newEvent); err != nil {
 		return nil, fmt.Errorf("failed to track event: %w", err)
 	}
 
-	// Index by campaign for quick lookup
-	campaignEventKey := fmt.Sprintf("campaign:%s:events:%s", req.CampaignID, event.ID)
-	_ = e.db.Create(ctx, campaignEventKey, event.ID)
-
-	// Index by user if provided
-	if req.UserID != "" {
-		userEventKey := fmt.Sprintf("user:%s:events:%s", req.UserID, event.ID)
-		_ = e.db.Create(ctx, userEventKey, event.ID)
-	}
-
-	return event, nil
+	return newEvent, nil
 }
 
 // GetEventByID retrieves an event by ID
 func (e *EventUseCase) GetEventByID(ctx context.Context, eventID string) (*domain.Event, error) {
-	key := fmt.Sprintf("event:%s", eventID)
-	eventInterface, err := e.db.Read(ctx, key)
-	if err != nil || eventInterface == nil {
-		return nil, fmt.Errorf("event not found: %w", err)
-	}
+	_ = ctx
 
-	event, ok := eventInterface.(*domain.Event)
-	if !ok {
-		return nil, errors.New("invalid event data format")
+	event, err := e.eventRepo.GetByID(eventID)
+	if err != nil || event == nil {
+		return nil, fmt.Errorf("event not found: %w", err)
 	}
 
 	return event, nil
@@ -82,19 +58,11 @@ func (e *EventUseCase) GetEventByID(ctx context.Context, eventID string) (*domai
 
 // GetEventsByCampaign retrieves all events for a campaign
 func (e *EventUseCase) GetEventsByCampaign(ctx context.Context, campaignID string) ([]domain.Event, error) {
-	events := []domain.Event{}
-	results, err := e.db.List(ctx, fmt.Sprintf("campaign:%s:events:", campaignID))
+	_ = ctx
+
+	events, err := e.eventRepo.GetByCampaignID(campaignID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch campaign events: %w", err)
-	}
-
-	for _, result := range results {
-		if eventID, ok := result.(string); ok {
-			event, err := e.GetEventByID(ctx, eventID)
-			if err == nil {
-				events = append(events, *event)
-			}
-		}
 	}
 
 	return events, nil
@@ -102,19 +70,11 @@ func (e *EventUseCase) GetEventsByCampaign(ctx context.Context, campaignID strin
 
 // GetEventsByUser retrieves all events for a user
 func (e *EventUseCase) GetEventsByUser(ctx context.Context, userID string) ([]domain.Event, error) {
-	events := []domain.Event{}
-	results, err := e.db.List(ctx, fmt.Sprintf("user:%s:events:", userID))
+	_ = ctx
+
+	events, err := e.eventRepo.GetByUserID(userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch user events: %w", err)
-	}
-
-	for _, result := range results {
-		if eventID, ok := result.(string); ok {
-			event, err := e.GetEventByID(ctx, eventID)
-			if err == nil {
-				events = append(events, *event)
-			}
-		}
 	}
 
 	return events, nil
@@ -122,16 +82,11 @@ func (e *EventUseCase) GetEventsByUser(ctx context.Context, userID string) ([]do
 
 // GetEventsByType retrieves events of a specific type
 func (e *EventUseCase) GetEventsByType(ctx context.Context, eventType domain.EventType) ([]domain.Event, error) {
-	events := []domain.Event{}
-	results, err := e.db.List(ctx, "event:")
+	_ = ctx
+
+	events, err := e.eventRepo.GetByEventType(eventType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch events: %w", err)
-	}
-
-	for _, result := range results {
-		if event, ok := result.(*domain.Event); ok && event.EventType == eventType {
-			events = append(events, *event)
-		}
 	}
 
 	return events, nil

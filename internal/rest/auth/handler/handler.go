@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 
+	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/domain"
 	auth_usecase "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/auth/usecase"
 )
 
@@ -35,18 +37,19 @@ func (h *AuthHandler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error": "Email, password, and name are required"}`, http.StatusBadRequest)
 		return
 	}
+	req.Role = strings.ToLower(req.Role)
 	if req.Role != "admin" && req.Role != "marketer" && req.Role != "analyst" {
-		http.Error(w, `{"error": "Invalid role. Must be 'admin' or 'marketer' or analyst"}`, http.StatusBadRequest)
+		http.Error(w, `{"error": "Invalid role. Must be 'admin' or 'marketer' or 'analyst'"}`, http.StatusBadRequest)
 		return
 	}
-	usecaseReq := auth_usecase.RegisterRequest{
+	user := &domain.User{
 		Email:    req.Email,
 		Password: req.Password,
 		Name:     req.Name,
-		Role:     req.Role,
+		Role:     domain.Role(req.Role),
 	}
 
-	result, err := h.usecase.Register(context.Background(), usecaseReq)
+	result, err := h.usecase.Register(context.Background(), user)
 	if err != nil {
 		http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusBadRequest)
 		return
@@ -79,17 +82,16 @@ func (h *AuthHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call usecase
-	usecaseReq := auth_usecase.LoginRequest{
+	credentials := &domain.User{
 		Email:    req.Email,
 		Password: req.Password,
 	}
 
-	result, err := h.usecase.Login(context.Background(), usecaseReq)
+	result, err := h.usecase.Login(context.Background(), credentials)
 	if err != nil {
 		http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusUnauthorized)
 		return
 	}
-
 	response := map[string]interface{}{
 		"message": "Login successful",
 		"token":   result.Token,

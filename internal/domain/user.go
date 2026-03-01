@@ -10,13 +10,12 @@ const (
 	AnalystRole  Role = "analyst"
 )
 
-// User represents a user entity with profile and auth info
 type User struct {
 	ID        string    `json:"id"`
 	Email     string    `json:"email"`
-	Password  string    `json:"-"` // Never expose in API responses
+	Password  string    `json:"-"`
 	Name      string    `json:"name"`
-	Role      Role      `json:"role"` // Admin, Marketer, Analyst
+	Role      Role      `json:"role"`
 	Bio       string    `json:"bio"`
 	Phone     string    `json:"phone"`
 	Picture   string    `json:"picture"`

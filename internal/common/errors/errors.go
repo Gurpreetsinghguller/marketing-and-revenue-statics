@@ -1,4 +1,4 @@
-package middleware
+package errors
 
 // Custom errors
 var (

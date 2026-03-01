@@ -166,9 +166,14 @@ paths:
           schema:
             type: string
         - in: query
-          name: channel
+          name: budget
           schema:
-            type: string
+            type: number
+            format: float
+        - in: query
+          name: is_public
+          schema:
+            type: boolean
       responses:
         "200":
           description: Campaign list
@@ -230,7 +235,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateCampaignRequest"
+              $ref: "#/components/schemas/UpdateCampaignRequest"
       responses:
         "200":
           description: Campaign updated
@@ -246,6 +251,80 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "401":
           description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /campaigns/{id}/status:
+    patch:
+      summary: Update campaign status
+      tags: [Campaigns]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CampaignId"
+        - $ref: "#/components/parameters/UserRoleHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchCampaignStatusRequest"
+      responses:
+        "200":
+          description: Campaign status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Campaign"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /campaigns/{id}/end:
+    patch:
+      summary: End campaign (mark inactive)
+      tags: [Campaigns]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CampaignId"
+        - $ref: "#/components/parameters/UserRoleHeader"
+      responses:
+        "200":
+          description: Campaign ended successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Campaign"
+        "400":
+          description: Campaign cannot be ended in current state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Campaign not found
           content:
             application/json:
               schema:
@@ -459,6 +538,33 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AnalyticsReport"
+  /analytics/campaigns/{campaign_id}/stats:
+    get:
+      summary: Campaign stats by campaign ID
+      tags: [Analytics]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CampaignIdPath"
+      responses:
+        "200":
+          description: Campaign statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignStats"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Campaign not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /users/{user_id}/engagement:
     get:
       summary: User engagement summary
@@ -672,7 +778,7 @@ components:
           type: boolean
     CreateCampaignRequest:
       type: object
-      required: [name]
+      required: [name, channel]
       properties:
         name:
           type: string
@@ -689,6 +795,29 @@ components:
           type: string
         is_public:
           type: boolean
+    UpdateCampaignRequest:
+      type: object
+      required: [name, status]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        budget:
+          type: number
+          format: float
+        is_public:
+          type: boolean
+        status:
+          type: string
+          enum: [active, paused, completed]
+    PatchCampaignStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [active, paused, completed]
     Event:
       type: object
       properties:
@@ -742,6 +871,28 @@ components:
     AnalyticsReport:
       type: object
       additionalProperties: true
+    CampaignStats:
+      type: object
+      properties:
+        campaign_id:
+          type: string
+        campaign_name:
+          type: string
+        total_impressions:
+          type: integer
+        total_clicks:
+          type: integer
+        total_conversions:
+          type: integer
+        total_revenue:
+          type: number
+          format: float
+        ctr:
+          type: number
+          format: float
+        conversion_rate:
+          type: number
+          format: float
     UserEngagement:
       type: object
       properties:

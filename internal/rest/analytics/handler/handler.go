@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	analytics_usecase "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/analytics/usecase"
+	"github.com/gorilla/mux"
 )
 
 // Metrics represents campaign metrics
@@ -78,7 +79,7 @@ func (h *AnalyticsHandler) GetDailyReportHandler(w http.ResponseWriter, r *http.
 	}
 
 	// Call usecase
-	report, err := h.usecase.GetDailyReport(context.Background(), date)
+	report, err := h.usecase.GetDailyReport(r.Context(), date)
 	if err != nil {
 		http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
 		return
@@ -146,6 +147,35 @@ func (h *AnalyticsHandler) GetPublicStatsHandler(w http.ResponseWriter, r *http.
 	// Call usecase (no auth required for public stats)
 	stats, err := h.usecase.GetPublicStats(context.Background())
 	if err != nil {
+		http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(stats)
+}
+
+// GetCampaignStatsHandler retrieves campaign statistics by campaign ID
+func (h *AnalyticsHandler) GetCampaignStatsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		http.Error(w, `{"error": "User not authenticated"}`, http.StatusUnauthorized)
+		return
+	}
+
+	campaignID := mux.Vars(r)["campaign_id"]
+	if campaignID == "" {
+		http.Error(w, `{"error": "campaign_id is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	stats, err := h.usecase.GetCampaignStats(context.Background(), campaignID)
+	if err != nil {
+		if err.Error() == "campaign not found" {
+			http.Error(w, `{"error": "campaign not found"}`, http.StatusNotFound)
+			return
+		}
 		http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
 		return
 	}

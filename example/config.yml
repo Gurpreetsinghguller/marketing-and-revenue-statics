@@ -1,0 +1,12 @@
+server:
+  port: "8080"
+
+log:
+  level: "info"
+
+auth:
+  secret_file: "shared/secret"
+
+rate_limit:
+  max_requests: 100
+  window_seconds: 60

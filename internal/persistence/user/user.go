@@ -70,7 +70,6 @@ func userKey(id string) string {
 	return userPrefix + "/" + id
 }
 
-// UserRepository implements domain.UserRepo.
 type UserRepository struct {
 	storage db.PersistenceDB
 }

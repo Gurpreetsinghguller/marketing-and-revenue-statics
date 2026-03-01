@@ -6,47 +6,38 @@ import (
 	"fmt"
 
 	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/domain"
-	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/persistence/db"
 )
 
 // ProfileUseCase handles user profile business logic
 type ProfileUseCase struct {
-	db db.PersistenceDB
+	userRepo domain.UserRepo
 }
 
 // NewProfileUseCase creates a new profile usecase
-func NewProfileUseCase(db db.PersistenceDB) *ProfileUseCase {
+func NewProfileUseCase(userRepo domain.UserRepo) *ProfileUseCase {
 	return &ProfileUseCase{
-		db: db,
+		userRepo: userRepo,
 	}
-}
-
-// UpdateProfileRequest represents profile update input
-type UpdateProfileRequest struct {
-	Name    string
-	Bio     string
-	Phone   string
-	Picture string
 }
 
 // GetProfile retrieves user profile
 func (p *ProfileUseCase) GetProfile(ctx context.Context, userID string) (*domain.User, error) {
-	key := fmt.Sprintf("user:%s", userID)
-	userInterface, err := p.db.Read(ctx, key)
-	if err != nil || userInterface == nil {
-		return nil, fmt.Errorf("user not found: %w", err)
-	}
+	_ = ctx
 
-	user, ok := userInterface.(*domain.User)
-	if !ok {
-		return nil, errors.New("invalid user data format")
+	user, err := p.userRepo.GetByID(userID)
+	if err != nil || user == nil {
+		return nil, fmt.Errorf("user not found: %w", err)
 	}
 
 	return user, nil
 }
 
 // UpdateProfile updates user profile
-func (p *ProfileUseCase) UpdateProfile(ctx context.Context, userID string, req UpdateProfileRequest) (*domain.User, error) {
+func (p *ProfileUseCase) UpdateProfile(ctx context.Context, userID string, updates *domain.User) (*domain.User, error) {
+	if updates == nil {
+		return nil, errors.New("user profile updates are required")
+	}
+
 	// Fetch existing user
 	user, err := p.GetProfile(ctx, userID)
 	if err != nil {
@@ -54,22 +45,21 @@ func (p *ProfileUseCase) UpdateProfile(ctx context.Context, userID string, req U
 	}
 
 	// Update fields
-	if req.Name != "" {
-		user.Name = req.Name
+	if updates.Name != "" {
+		user.Name = updates.Name
 	}
-	if req.Bio != "" {
-		user.Bio = req.Bio
+	if updates.Bio != "" {
+		user.Bio = updates.Bio
 	}
-	if req.Phone != "" {
-		user.Phone = req.Phone
+	if updates.Phone != "" {
+		user.Phone = updates.Phone
 	}
-	if req.Picture != "" {
-		user.Picture = req.Picture
+	if updates.Picture != "" {
+		user.Picture = updates.Picture
 	}
 
 	// Save updated profile
-	key := fmt.Sprintf("user:%s", userID)
-	if err := p.db.Update(ctx, key, user); err != nil {
+	if err := p.userRepo.Update(user); err != nil {
 		return nil, fmt.Errorf("failed to update profile: %w", err)
 	}
 

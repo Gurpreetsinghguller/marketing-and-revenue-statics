@@ -1,21 +1,33 @@
 package domain
 
+import "time"
+
+type CampaignStatus string
+
+const (
+	CampaignStatusActive    CampaignStatus = "active"
+	CampaignStatusPaused    CampaignStatus = "paused"
+	CampaignStatusCompleted CampaignStatus = "completed"
+	CampaignStatusInactive  CampaignStatus = "inactive"
+)
+
 // from the requirements, we need a Campaign entity with fields like ID, Name, Description, Status, DateRange, Channel, CreatedBy, IsPublic
 type Campaign struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	Status      string    `json:"status"` // Active, Paused, Completed
-	DateRange   DateRange `json:"date_range"`
-	Budget      float64   `json:"budget"`
-	Channel     string    `json:"channel"` // Email, Social Media, etc.
-	CreatedBy   string    `json:"created_by"`
-	IsPublic    bool      `json:"is_public"`
+	ID          string         `json:"id"`
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	Status      CampaignStatus `json:"status"` // Active, Paused, Completed
+	DateRange   DateRange      `json:"date_range"`
+	Budget      float64        `json:"budget"`
+	Channel     string         `json:"channel"` // Email, Social Media, etc.
+	CreatedBy   string         `json:"created_by"`
+	IsPublic    bool           `json:"is_public"`
+	UpdatedAt   time.Time      `json:"updated_at"`
 }
 
 type DateRange struct {
-	Start string `json:"start"`
-	End   string `json:"end"`
+	Start *time.Time `json:"start"`
+	End   *time.Time `json:"end"`
 }
 
 // This will be implemented by persistence layer (e.g., database) to manage campaign data
@@ -29,20 +41,8 @@ type CampaignRepo interface {
 	// GetAll retrieves all campaigns
 	GetAll() ([]Campaign, error)
 
-	// GetByStatus retrieves campaigns filtered by status (Active, Paused, Completed)
-	GetByStatus(status string) ([]Campaign, error)
-
-	// GetByCreatedBy retrieves campaigns created by a specific marketer
-	GetByCreatedBy(userID string) ([]Campaign, error)
-
-	// GetByChannel retrieves campaigns filtered by channel
-	GetByChannel(channel string) ([]Campaign, error)
-
 	// GetPublic retrieves all public campaigns (accessible without auth)
 	GetPublic() ([]Campaign, error)
-
-	// GetByDateRange retrieves campaigns within a date range
-	GetByDateRange(startDate, endDate string) ([]Campaign, error)
 
 	// Update updates an existing campaign
 	Update(campaign *Campaign) error
@@ -54,6 +54,6 @@ type CampaignRepo interface {
 	Search(query string) ([]Campaign, error)
 
 	// GetWithFilters retrieves campaigns with multiple filters applied
-	// Filters: status, channel, created_by, date_range, etc.
+	// Filters: status, channel, date_range, etc.
 	GetWithFilters(filters map[string]interface{}) ([]Campaign, error)
 }

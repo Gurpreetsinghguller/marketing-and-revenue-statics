@@ -3,6 +3,9 @@ package campaign
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"math"
+	"regexp"
 	"strings"
 	"time"
 
@@ -13,8 +16,8 @@ import (
 const campaignPrefix = "campaigns"
 
 type campaignDBDateRange struct {
-	Start string `json:"start"`
-	End   string `json:"end"`
+	Start time.Time `json:"start"`
+	End   time.Time `json:"end"`
 }
 
 type campaignDBModel struct {
@@ -30,20 +33,24 @@ type campaignDBModel struct {
 }
 
 func toCampaignDBModel(c domain.Campaign) campaignDBModel {
-	return campaignDBModel{
+	cc := &campaignDBModel{
 		ID:          c.ID,
 		Name:        c.Name,
 		Description: c.Description,
-		Status:      c.Status,
-		DateRange: campaignDBDateRange{
-			Start: c.DateRange.Start,
-			End:   c.DateRange.End,
-		},
+		Status:      string(c.Status),
+
 		Budget:    c.Budget,
 		Channel:   c.Channel,
 		CreatedBy: c.CreatedBy,
 		IsPublic:  c.IsPublic,
 	}
+	if c.DateRange.Start != nil {
+		cc.DateRange.Start = *c.DateRange.Start
+	}
+	if c.DateRange.End != nil {
+		cc.DateRange.End = *c.DateRange.End
+	}
+	return *cc
 }
 
 func (m campaignDBModel) toDomain() domain.Campaign {
@@ -51,10 +58,10 @@ func (m campaignDBModel) toDomain() domain.Campaign {
 		ID:          m.ID,
 		Name:        m.Name,
 		Description: m.Description,
-		Status:      m.Status,
+		Status:      domain.CampaignStatus(m.Status),
 		DateRange: domain.DateRange{
-			Start: m.DateRange.Start,
-			End:   m.DateRange.End,
+			Start: &m.DateRange.Start,
+			End:   &m.DateRange.End,
 		},
 		Budget:    m.Budget,
 		Channel:   m.Channel,
@@ -138,54 +145,6 @@ func (r *CampaignRepository) GetAll() ([]domain.Campaign, error) {
 	return result, nil
 }
 
-// GetByStatus retrieves campaigns by status
-func (r *CampaignRepository) GetByStatus(status string) ([]domain.Campaign, error) {
-	all, err := r.GetAll()
-	if err != nil {
-		return nil, err
-	}
-
-	var result []domain.Campaign
-	for i := range all {
-		if all[i].Status == status {
-			result = append(result, all[i])
-		}
-	}
-	return result, nil
-}
-
-// GetByCreatedBy retrieves campaigns created by a user
-func (r *CampaignRepository) GetByCreatedBy(userID string) ([]domain.Campaign, error) {
-	all, err := r.GetAll()
-	if err != nil {
-		return nil, err
-	}
-
-	var result []domain.Campaign
-	for i := range all {
-		if all[i].CreatedBy == userID {
-			result = append(result, all[i])
-		}
-	}
-	return result, nil
-}
-
-// GetByChannel retrieves campaigns by channel
-func (r *CampaignRepository) GetByChannel(channel string) ([]domain.Campaign, error) {
-	all, err := r.GetAll()
-	if err != nil {
-		return nil, err
-	}
-
-	var result []domain.Campaign
-	for i := range all {
-		if all[i].Channel == channel {
-			result = append(result, all[i])
-		}
-	}
-	return result, nil
-}
-
 // GetPublic retrieves all public campaigns
 func (r *CampaignRepository) GetPublic() ([]domain.Campaign, error) {
 	all, err := r.GetAll()
@@ -196,29 +155,6 @@ func (r *CampaignRepository) GetPublic() ([]domain.Campaign, error) {
 	var result []domain.Campaign
 	for i := range all {
 		if all[i].IsPublic {
-			result = append(result, all[i])
-		}
-	}
-	return result, nil
-}
-
-// GetByDateRange retrieves campaigns within a date range
-func (r *CampaignRepository) GetByDateRange(startDate, endDate string) ([]domain.Campaign, error) {
-	all, err := r.GetAll()
-	if err != nil {
-		return nil, err
-	}
-
-	start, _ := time.Parse("2006-01-02", startDate)
-	end, _ := time.Parse("2006-01-02", endDate)
-
-	var result []domain.Campaign
-	for i := range all {
-		campaignStart, _ := time.Parse("2006-01-02", all[i].DateRange.Start)
-		campaignEnd, _ := time.Parse("2006-01-02", all[i].DateRange.End)
-
-		// Check overlap
-		if campaignStart.Before(end) && campaignEnd.After(start) {
 			result = append(result, all[i])
 		}
 	}
@@ -246,11 +182,14 @@ func (r *CampaignRepository) Search(query string) ([]domain.Campaign, error) {
 		return nil, err
 	}
 
-	query = strings.ToLower(query)
+	pattern, err := regexp.Compile("(?i)" + query)
+	if err != nil {
+		return nil, fmt.Errorf("invalid search pattern: %w", err)
+	}
+
 	var result []domain.Campaign
 	for i := range all {
-		if strings.Contains(strings.ToLower(all[i].Name), query) ||
-			strings.Contains(strings.ToLower(all[i].Description), query) {
+		if pattern.MatchString(all[i].Name) || pattern.MatchString(all[i].Description) {
 			result = append(result, all[i])
 		}
 	}
@@ -271,14 +210,26 @@ func (r *CampaignRepository) GetWithFilters(filters map[string]interface{}) ([]d
 		match := true
 
 		// Apply filters
-		if status, ok := filters["status"].(string); ok && campaign.Status != status {
-			match = false
+		if status, ok := filters["status"].(string); ok {
+			if !strings.EqualFold(string(campaign.Status), status) {
+				match = false
+			}
 		}
 		if channel, ok := filters["channel"].(string); ok && campaign.Channel != channel {
 			match = false
 		}
 		if createdBy, ok := filters["created_by"].(string); ok && campaign.CreatedBy != createdBy {
 			match = false
+		}
+		if budget, ok := filters["budget"].(float64); ok {
+			if math.Abs(campaign.Budget-budget) > 1e-9 {
+				match = false
+			}
+		}
+		if isPublic, ok := filters["is_public"].(bool); ok {
+			if campaign.IsPublic != isPublic {
+				match = false
+			}
 		}
 
 		// Add more filter logic as needed

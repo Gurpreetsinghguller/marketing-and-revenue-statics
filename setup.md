@@ -20,14 +20,37 @@ mkdir -p shared
 echo -n "your-strong-secret" > shared/secret
 ```
 
+Example secret file content:
+```text
+your-strong-secret
+```
+
 Load the secret into the environment for the API server:
 ```bash
 export JWT_SECRET="$(cat shared/secret)"
 ```
 
+### Configure Application YAML
+Create or update [config/config.yml](config/config.yml):
+
+```yaml
+server:
+	port: "8080"
+
+log:
+	level: "info"
+
+auth:
+	secret_file: "shared/secret"
+
+rate_limit:
+	max_requests: 100
+	window_seconds: 60
+```
+
 ### Run the API Server
 ```bash
-go run ./cmd/statistics
+go run ./cmd
 ```
 
 The API is available at:
@@ -37,16 +60,10 @@ http://localhost:8080/api/v1/docs          (OpenAPI spec)
 http://localhost:8080/api/v1/auth/register (Example endpoint)
 ```
 
-### Generate a JWT Token for Testing
-The token generator reads `shared/secret` automatically if `-secret` or `JWT_SECRET` are not provided.
+Notes:
+- Server port and log level are loaded from `config/config.yml`.
+- `shared/secret` is ignored by git.
 
-```bash
-go run ./cmd/tokengen -user user_123 -role marketer -ttl 24h
-```
-
-Example usage in Postman:
-- Authorization header: `Bearer <token>`
-- X-User-Role header (optional): `Marketer` or `Admin` for role-protected routes
 
 ### Useful Commands
 Format code:

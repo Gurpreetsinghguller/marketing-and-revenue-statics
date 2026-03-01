@@ -2,130 +2,120 @@ package usecase
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"os"
+	"strings"
+	"time"
 
 	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/domain"
-	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/persistence/db"
+	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/crypto/bcrypt"
 )
+
+const tokenTTL = 24 * time.Hour
+
+type tokenClaims struct {
+	Role string `json:"role"`
+	jwt.RegisteredClaims
+}
 
 // AuthUseCase handles authentication business logic
 type AuthUseCase struct {
-	db db.PersistenceDB
+	userRepo domain.UserRepo
 }
 
-// NewAuthUseCase creates a new auth usecase
-func NewAuthUseCase(db db.PersistenceDB) *AuthUseCase {
+func NewAuthUseCase(userRepo domain.UserRepo) *AuthUseCase {
 	return &AuthUseCase{
-		db: db,
+		userRepo: userRepo,
 	}
 }
 
-// RegisterRequest represents registration input
-type RegisterRequest struct {
-	Email    string
-	Password string
-	Name     string
-	Role     string
-}
-
-// RegisterResponse represents registration output
 type RegisterResponse struct {
 	UserID string
 	Token  string
 }
 
-// LoginRequest represents login input
-type LoginRequest struct {
-	Email    string
-	Password string
-}
-
-// LoginResponse represents login output
 type LoginResponse struct {
 	Token string
 	User  *domain.User
 }
 
-// Register creates a new user account
-func (u *AuthUseCase) Register(ctx context.Context, req RegisterRequest) (*RegisterResponse, error) {
-	if req.Email == "" || req.Password == "" || req.Name == "" {
+func (u *AuthUseCase) Register(ctx context.Context, user *domain.User) (*RegisterResponse, error) {
+	_ = ctx
+
+	if user == nil {
+		return nil, errors.New("user is required")
+	}
+
+	if user.Email == "" || user.Password == "" || user.Name == "" {
 		return nil, errors.New("email, password, and name are required")
 	}
 
-	// Check if email already exists
-	key := fmt.Sprintf("user:email:%s", req.Email)
-	exists, err := u.db.Read(ctx, key)
-	if err == nil && exists != nil {
+	if u.userRepo.EmailExists(user.Email) {
 		return nil, errors.New("email already exists")
 	}
 
-	//TODO: Password Hashing and ID generation
-	user := &domain.User{
-		ID:       fmt.Sprintf("user_%d", len([]int{})),
-		Email:    req.Email,
-		Password: req.Password,
-		Name:     req.Name,
-		Role:     domain.Role(req.Role),
+	userID, err := generateUserID()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate user id: %w", err)
 	}
 
-	// Save user
-	userKey := fmt.Sprintf("user:%s", user.ID)
-	if err := u.db.Create(ctx, userKey, user); err != nil {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	newUser := &domain.User{
+		ID:       userID,
+		Email:    user.Email,
+		Password: string(hashedPassword),
+		Name:     user.Name,
+		Role:     user.Role,
+	}
+
+	if err := u.userRepo.Create(newUser); err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
 
-	// Index by email for quick lookup
-	if err := u.db.Create(ctx, key, user.ID); err != nil {
-		return nil, fmt.Errorf("failed to index user: %w", err)
+	token, err := generateJWT(newUser.ID, newUser.Role)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate auth token: %w", err)
 	}
 
-	// Generate JWT token (simplified, use proper JWT in production)
-	token := fmt.Sprintf("jwt_token_%s", user.ID)
-
 	return &RegisterResponse{
-		UserID: user.ID,
+		UserID: newUser.ID,
 		Token:  token,
 	}, nil
 }
 
 // Login authenticates a user
-func (u *AuthUseCase) Login(ctx context.Context, req LoginRequest) (*LoginResponse, error) {
-	if req.Email == "" || req.Password == "" {
+func (u *AuthUseCase) Login(ctx context.Context, credentials *domain.User) (*LoginResponse, error) {
+	_ = ctx
+
+	if credentials == nil {
+		return nil, errors.New("credentials are required")
+	}
+
+	if credentials.Email == "" || credentials.Password == "" {
 		return nil, errors.New("email and password are required")
 	}
 
-	// Get user by email
-	emailKey := fmt.Sprintf("user:email:%s", req.Email)
-	userIDInterface, err := u.db.Read(ctx, emailKey)
-	if err != nil || userIDInterface == nil {
+	user, err := u.userRepo.GetByEmail(credentials.Email)
+	if err != nil || user == nil {
 		return nil, errors.New("invalid email or password")
 	}
 
-	userID, ok := userIDInterface.(string)
-	if !ok {
-		return nil, errors.New("invalid user data")
-	}
-
-	// Fetch user details
-	userKey := fmt.Sprintf("user:%s", userID)
-	userInterface, err := u.db.Read(ctx, userKey)
-	if err != nil || userInterface == nil {
-		return nil, errors.New("user not found")
-	}
-
-	user, ok := userInterface.(*domain.User)
-	if !ok {
-		return nil, errors.New("invalid user data format")
-	}
-
-	// Validate password (in production, use proper password hashing comparison)
-	if user.Password != req.Password {
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(credentials.Password)); err != nil {
 		return nil, errors.New("invalid email or password")
 	}
 
-	// Generate JWT token (simplified)
-	token := fmt.Sprintf("jwt_token_%s", user.ID)
+	token, err := generateJWT(user.ID, user.Role)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate auth token: %w", err)
+	}
 
 	return &LoginResponse{
 		Token: token,
@@ -133,33 +123,45 @@ func (u *AuthUseCase) Login(ctx context.Context, req LoginRequest) (*LoginRespon
 	}, nil
 }
 
-// GetUserByID retrieves user by ID
-func (u *AuthUseCase) GetUserByID(ctx context.Context, userID string) (*domain.User, error) {
-	userKey := fmt.Sprintf("user:%s", userID)
-	userInterface, err := u.db.Read(ctx, userKey)
-	if err != nil || userInterface == nil {
-		return nil, fmt.Errorf("user not found: %w", err)
+func generateUserID() (string, error) {
+	idBytes := make([]byte, 16)
+	if _, err := rand.Read(idBytes); err != nil {
+		return "", err
 	}
 
-	user, ok := userInterface.(*domain.User)
-	if !ok {
-		return nil, errors.New("invalid user data format")
-	}
-
-	return user, nil
+	return fmt.Sprintf("user_%s", hex.EncodeToString(idBytes)), nil
 }
 
-// VerifyToken verifies JWT token and returns user ID (simplified)
-func (u *AuthUseCase) VerifyToken(ctx context.Context, token string) (string, error) {
-	if token == "" {
-		return "", errors.New("token is required")
+func generateJWT(userID string, role domain.Role) (string, error) {
+	secret := loadJWTSecret()
+	if secret == "" {
+		return "", errors.New("jwt secret is missing")
 	}
 
-	// Simplified token verification - in production use proper JWT library
-	// For now, just extract userID from token format: "jwt_token_<userID>"
-	if len(token) < 10 {
-		return "", errors.New("invalid token format")
+	now := time.Now().UTC()
+	claims := tokenClaims{
+		Role: string(role),
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   userID,
+			IssuedAt:  jwt.NewNumericDate(now),
+			NotBefore: jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(now.Add(tokenTTL)),
+		},
 	}
 
-	return "", nil // In production, properly validate JWT
+	jwtToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return jwtToken.SignedString([]byte(secret))
+}
+
+func loadJWTSecret() string {
+	if secret := strings.TrimSpace(os.Getenv("JWT_SECRET")); secret != "" {
+		return secret
+	}
+
+	data, err := os.ReadFile("shared/secret")
+	if err != nil {
+		return ""
+	}
+
+	return strings.TrimSpace(string(data))
 }

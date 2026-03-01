@@ -4,18 +4,18 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/persistence/db"
+	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/domain"
 )
 
 // EngagementUseCase handles user engagement and behavioral data
 type EngagementUseCase struct {
-	db db.PersistenceDB
+	eventRepo domain.EventRepo
 }
 
 // NewEngagementUseCase creates a new engagement usecase
-func NewEngagementUseCase(db db.PersistenceDB) *EngagementUseCase {
+func NewEngagementUseCase(eventRepo domain.EventRepo) *EngagementUseCase {
 	return &EngagementUseCase{
-		db: db,
+		eventRepo: eventRepo,
 	}
 }
 
@@ -41,8 +41,10 @@ type CampaignFunnel struct {
 
 // GetUserEngagement retrieves user engagement metrics
 func (e *EngagementUseCase) GetUserEngagement(ctx context.Context, userID string) (*UserEngagement, error) {
+	_ = ctx
+
 	// Fetch all events for the user
-	userEvents, err := e.db.List(ctx, fmt.Sprintf("user:%s:events:", userID))
+	userEvents, err := e.eventRepo.GetByUserID(userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch user events: %w", err)
 	}
@@ -54,18 +56,9 @@ func (e *EngagementUseCase) GetUserEngagement(ctx context.Context, userID string
 
 	campaignMap := make(map[string]int64)
 
-	for _, result := range userEvents {
-		if eventID, ok := result.(string); ok {
-			eventKey := fmt.Sprintf("event:%s", eventID)
-			eventInterface, err := e.db.Read(ctx, eventKey)
-			if err != nil || eventInterface == nil {
-				continue
-			}
-
-			// Type assertion would be needed here with proper event handling
-			_ = eventInterface
-			campaignMap[""] = 0
-		}
+	for _, event := range userEvents {
+		campaignMap[event.CampaignID]++
+		engagement.TotalInteractions++
 	}
 
 	engagement.CampaignsEngaged = int64(len(campaignMap))
@@ -89,26 +82,26 @@ func (e *EngagementUseCase) GetUserCampaignEngagement(ctx context.Context, userI
 
 // GetCampaignFunnel retrieves campaign funnel data
 func (e *EngagementUseCase) GetCampaignFunnel(ctx context.Context, campaignID string) (*CampaignFunnel, error) {
+	_ = ctx
+
 	funnel := &CampaignFunnel{
 		CampaignID: campaignID,
 	}
 
 	// Fetch campaign events
-	campaignEvents, err := e.db.List(ctx, fmt.Sprintf("campaign:%s:events:", campaignID))
+	campaignEvents, err := e.eventRepo.GetByCampaignID(campaignID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch campaign events: %w", err)
 	}
 
-	for _, result := range campaignEvents {
-		if eventID, ok := result.(string); ok {
-			eventKey := fmt.Sprintf("event:%s", eventID)
-			eventInterface, err := e.db.Read(ctx, eventKey)
-			if err != nil || eventInterface == nil {
-				continue
-			}
-
-			// Type assertion would be needed here with proper event handling
-			_ = eventInterface
+	for _, event := range campaignEvents {
+		switch event.EventType {
+		case domain.EventType("impressions"):
+			funnel.Impressions++
+		case domain.EventType("clicks"):
+			funnel.Clicks++
+		case domain.EventType("conversions"):
+			funnel.Conversions++
 		}
 	}
 

@@ -4,10 +4,22 @@ import (
 	"context"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/common/config"
+	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/common/errors"
+	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/common/logger"
+	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/common/util"
 	"github.com/golang-jwt/jwt/v5"
+)
+
+var (
+	middlewareLog  = logger.Get()
+	configLoadOnce sync.Once
+	appConfig      *config.Config
 )
 
 // AuthMiddleware validates JWT token and extracts user info
@@ -32,6 +44,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		// Validate token
 		userID, userRole, err := validateToken(token)
 		if err != nil {
+			middlewareLog.WithError(err).Warn("invalid or expired auth token")
 			http.Error(w, `{"error": "Invalid or expired token"}`, http.StatusUnauthorized)
 			return
 		}
@@ -50,26 +63,49 @@ func AuthMiddleware(next http.Handler) http.Handler {
 
 // validateToken validates a JWT token and extracts user info.
 func validateToken(token string) (string, string, error) {
-	secret := os.Getenv("JWT_SECRET")
+	secret := loadJWTSecret()
 	if secret == "" {
-		return "", "", ErrMissingSecret
+		return "", "", errors.ErrMissingSecret
 	}
 
 	claims := &CustomClaims{}
 	parsed, err := jwt.ParseWithClaims(token, claims, func(t *jwt.Token) (interface{}, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, ErrInvalidToken
+		if t.Method != jwt.SigningMethodHS256 {
+			return nil, errors.ErrInvalidToken
 		}
 		return []byte(secret), nil
 	})
 	if err != nil || !parsed.Valid {
-		return "", "", ErrInvalidToken
+		if err != nil {
+			middlewareLog.WithError(err).Warn("token parse failed")
+		}
+		return "", "", errors.ErrInvalidToken
 	}
 	if claims.Subject == "" {
-		return "", "", ErrInvalidToken
+		return "", "", errors.ErrInvalidToken
 	}
 
 	return claims.Subject, claims.Role, nil
+}
+
+func loadJWTSecret() string {
+	if secret := strings.TrimSpace(os.Getenv("JWT_SECRET")); secret != "" {
+		return secret
+	}
+
+	cfg := getAppConfig()
+	secretPath := strings.TrimSpace(cfg.Auth.SecretFile)
+	if secretPath == "" {
+		secretPath = "shared/secret"
+	}
+
+	data, err := os.ReadFile(secretPath)
+	if err != nil {
+		middlewareLog.WithError(err).WithField("path", secretPath).Warn("failed to read jwt secret file")
+		return ""
+	}
+
+	return strings.TrimSpace(string(data))
 }
 
 // RoleMiddleware checks user role authorization
@@ -86,7 +122,7 @@ func RoleMiddleware(allowedRoles ...string) func(next http.Handler) http.Handler
 			// Check if role is in allowedRoles
 			isAllowed := false
 			for _, role := range allowedRoles {
-				if userRole == role {
+				if strings.EqualFold(strings.ToLower(userRole), strings.ToLower(role)) {
 					isAllowed = true
 					break
 				}
@@ -104,15 +140,8 @@ func RoleMiddleware(allowedRoles ...string) func(next http.Handler) http.Handler
 
 // RateLimitMiddleware applies rate limiting
 func RateLimitMiddleware(next http.Handler) http.Handler {
-	// Simple rate limiter using in-memory map (in production, use Redis or similar)
-	type RateLimitEntry struct {
-		count     int
-		resetTime time.Time
-	}
-
-	limitMap := make(map[string]*RateLimitEntry)
-	const maxRequests = 100
-	const windowDuration = 1 * time.Minute
+	cfg := getAppConfig()
+	limiter := util.NewFixedWindowRateLimiter(cfg.RateLimit.MaxRequests, time.Duration(cfg.RateLimit.WindowSeconds)*time.Second)
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Get identifier (user ID or IP)
@@ -121,24 +150,17 @@ func RateLimitMiddleware(next http.Handler) http.Handler {
 			identifier = getClientIP(r)
 		}
 
-		// Check current limit
-		now := time.Now()
-		entry, exists := limitMap[identifier]
-
-		if !exists || now.After(entry.resetTime) {
-			// New window or expired window
-			limitMap[identifier] = &RateLimitEntry{
-				count:     1,
-				resetTime: now.Add(windowDuration),
-			}
-		} else if entry.count >= maxRequests {
-			// Rate limit exceeded
-			w.Header().Set("Retry-After", "60")
+		allowed, retryAfter := limiter.Allow(identifier, time.Now())
+		if !allowed {
+			w.Header().Set("Retry-After", strconv.Itoa(retryAfter))
+			middlewareLog.WithFields(map[string]interface{}{
+				"identifier":  identifier,
+				"retry_after": retryAfter,
+				"path":        r.URL.Path,
+				"method":      r.Method,
+			}).Warn("rate limit exceeded")
 			http.Error(w, `{"error": "Rate limit exceeded"}`, http.StatusTooManyRequests)
 			return
-		} else {
-			// Increment counter
-			entry.count++
 		}
 
 		next.ServeHTTP(w, r)
@@ -167,19 +189,20 @@ func CORSMiddleware(next http.Handler) http.Handler {
 func LoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
+		writer := &statusResponseWriter{ResponseWriter: w, statusCode: http.StatusOK}
 
-		// Log request details (in production, use proper logging library)
-		_ = r.Method + " " + r.RequestURI
+		next.ServeHTTP(writer, r)
 
-		next.ServeHTTP(w, r)
-
-		// Log response time
-		duration := time.Since(start)
-		_ = duration // Use duration in actual logging
+		middlewareLog.WithFields(map[string]interface{}{
+			"method":      r.Method,
+			"path":        r.URL.Path,
+			"status":      writer.statusCode,
+			"duration_ms": time.Since(start).Milliseconds(),
+			"client_ip":   getClientIP(r),
+			"user_id":     r.Header.Get("X-User-ID"),
+		}).Info("http request")
 	})
 }
-
-// Helper functions
 
 // CustomClaims defines JWT claims used by the API.
 type CustomClaims struct {
@@ -196,4 +219,27 @@ func getClientIP(r *http.Request) string {
 
 	// Falls back to RemoteAddr
 	return strings.Split(r.RemoteAddr, ":")[0]
+}
+
+func getAppConfig() *config.Config {
+	configLoadOnce.Do(func() {
+		cfg, err := config.Load(config.DefaultConfigPath)
+		if err != nil {
+			middlewareLog.WithError(err).Warn("failed to load middleware config; using defaults")
+			cfg = config.Default()
+		}
+		appConfig = cfg
+	})
+
+	return appConfig
+}
+
+type statusResponseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (w *statusResponseWriter) WriteHeader(code int) {
+	w.statusCode = code
+	w.ResponseWriter.WriteHeader(code)
 }
