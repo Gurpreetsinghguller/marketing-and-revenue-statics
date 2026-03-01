@@ -27,6 +27,11 @@ type AuthUseCase struct {
 	userRepo domain.UserRepo
 }
 
+type AuthUseCaseInterface interface {
+	Register(ctx context.Context, user *domain.User) (*RegisterResponse, error)
+	Login(ctx context.Context, credentials *domain.User) (*LoginResponse, error)
+}
+
 func NewAuthUseCase(userRepo domain.UserRepo) *AuthUseCase {
 	return &AuthUseCase{
 		userRepo: userRepo,

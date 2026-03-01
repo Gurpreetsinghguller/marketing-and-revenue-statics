@@ -12,6 +12,10 @@ import (
 type ProfileUseCase struct {
 	userRepo domain.UserRepo
 }
+type ProfileUseCaseInterface interface {
+	GetProfile(ctx context.Context, userID string) (*domain.User, error)
+	UpdateProfile(ctx context.Context, userID string, updates *domain.User) (*domain.User, error)
+}
 
 // NewProfileUseCase creates a new profile usecase
 func NewProfileUseCase(userRepo domain.UserRepo) *ProfileUseCase {

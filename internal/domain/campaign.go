@@ -30,6 +30,36 @@ type DateRange struct {
 	End   *time.Time `json:"end"`
 }
 
+type CampaignStats struct {
+	CampaignID       string  `json:"campaign_id"`
+	CampaignName     string  `json:"campaign_name"`
+	TotalImpressions int64   `json:"total_impressions"`
+	TotalClicks      int64   `json:"total_clicks"`
+	TotalConversions int64   `json:"total_conversions"`
+	TotalRevenue     float64 `json:"total_revenue"`
+	CTR              float64 `json:"ctr"`
+	ConversionRate   float64 `json:"conversion_rate"`
+}
+
+// CampaignFunnel represents campaign funnel data
+type CampaignFunnel struct {
+	CampaignID     string
+	Impressions    int64
+	Clicks         int64
+	Conversions    int64
+	ConversionRate float64
+	DropoffRate    float64
+}
+
+type UserEngagement struct {
+	UserID            string
+	TotalInteractions int64
+	TotalDuration     int64
+	CampaignsEngaged  int64
+	AverageEngagement float64
+	TopCampaigns      []interface{}
+}
+
 // This will be implemented by persistence layer (e.g., database) to manage campaign data
 type CampaignRepo interface {
 	// Create saves a new campaign

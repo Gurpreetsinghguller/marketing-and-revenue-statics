@@ -16,6 +16,15 @@ type AnalyticsUseCase struct {
 	eventRepo    domain.EventRepo
 }
 
+type AnalyticsUseCaseInterface interface {
+	GetPublicStats(ctx context.Context) (map[string]interface{}, error)
+	GetCampaignStats(ctx context.Context, campaignID string) (*domain.CampaignStats, error)
+	GetAnalyticsReport(ctx context.Context) (map[string]interface{}, error)
+	GetDailyReport(ctx context.Context, date string) (map[string]interface{}, error)
+	GetWeeklyReport(ctx context.Context, weekStart string) (map[string]interface{}, error)
+	GetMonthlyReport(ctx context.Context, month string) (map[string]interface{}, error)
+}
+
 // NewAnalyticsUseCase creates a new analytics usecase
 func NewAnalyticsUseCase(campaignRepo domain.CampaignRepo, eventRepo domain.EventRepo) *AnalyticsUseCase {
 	return &AnalyticsUseCase{
@@ -25,16 +34,6 @@ func NewAnalyticsUseCase(campaignRepo domain.CampaignRepo, eventRepo domain.Even
 }
 
 // CampaignStats represents campaign statistics
-type CampaignStats struct {
-	CampaignID       string  `json:"campaign_id"`
-	CampaignName     string  `json:"campaign_name"`
-	TotalImpressions int64   `json:"total_impressions"`
-	TotalClicks      int64   `json:"total_clicks"`
-	TotalConversions int64   `json:"total_conversions"`
-	TotalRevenue     float64 `json:"total_revenue"`
-	CTR              float64 `json:"ctr"`
-	ConversionRate   float64 `json:"conversion_rate"`
-}
 
 // GetPublicStats returns public statistics
 func (a *AnalyticsUseCase) GetPublicStats(ctx context.Context) (map[string]interface{}, error) {
@@ -60,7 +59,7 @@ func (a *AnalyticsUseCase) GetPublicStats(ctx context.Context) (map[string]inter
 }
 
 // GetCampaignStats returns statistics for a specific campaign
-func (a *AnalyticsUseCase) GetCampaignStats(ctx context.Context, campaignID string) (*CampaignStats, error) {
+func (a *AnalyticsUseCase) GetCampaignStats(ctx context.Context, campaignID string) (*domain.CampaignStats, error) {
 	_ = ctx
 
 	// Fetch campaign
@@ -75,7 +74,7 @@ func (a *AnalyticsUseCase) GetCampaignStats(ctx context.Context, campaignID stri
 		return nil, fmt.Errorf("failed to fetch campaign events: %w", err)
 	}
 
-	stats := &CampaignStats{
+	stats := &domain.CampaignStats{
 		CampaignID:   campaignID,
 		CampaignName: campaign.Name,
 	}

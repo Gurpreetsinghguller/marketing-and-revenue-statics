@@ -12,6 +12,14 @@ type EngagementUseCase struct {
 	eventRepo domain.EventRepo
 }
 
+// EngagementUseCaseInterface defines available engagement analytics methods.
+// Use it in handlers rather than depending directly on *EngagementUseCase.
+type EngagementUseCaseInterface interface {
+	GetUserEngagement(ctx context.Context, userID string) (*domain.UserEngagement, error)
+	GetUserCampaignEngagement(ctx context.Context, userID, campaignID string) (map[string]interface{}, error)
+	GetCampaignFunnel(ctx context.Context, campaignID string) (*domain.CampaignFunnel, error)
+}
+
 // NewEngagementUseCase creates a new engagement usecase
 func NewEngagementUseCase(eventRepo domain.EventRepo) *EngagementUseCase {
 	return &EngagementUseCase{
@@ -20,27 +28,9 @@ func NewEngagementUseCase(eventRepo domain.EventRepo) *EngagementUseCase {
 }
 
 // UserEngagement represents user engagement metrics
-type UserEngagement struct {
-	UserID            string
-	TotalInteractions int64
-	TotalDuration     int64
-	CampaignsEngaged  int64
-	AverageEngagement float64
-	TopCampaigns      []interface{}
-}
-
-// CampaignFunnel represents campaign funnel data
-type CampaignFunnel struct {
-	CampaignID     string
-	Impressions    int64
-	Clicks         int64
-	Conversions    int64
-	ConversionRate float64
-	DropoffRate    float64
-}
 
 // GetUserEngagement retrieves user engagement metrics
-func (e *EngagementUseCase) GetUserEngagement(ctx context.Context, userID string) (*UserEngagement, error) {
+func (e *EngagementUseCase) GetUserEngagement(ctx context.Context, userID string) (*domain.UserEngagement, error) {
 	_ = ctx
 
 	// Fetch all events for the user
@@ -49,7 +39,7 @@ func (e *EngagementUseCase) GetUserEngagement(ctx context.Context, userID string
 		return nil, fmt.Errorf("failed to fetch user events: %w", err)
 	}
 
-	engagement := &UserEngagement{
+	engagement := &domain.UserEngagement{
 		UserID:       userID,
 		TopCampaigns: []interface{}{},
 	}
@@ -81,10 +71,10 @@ func (e *EngagementUseCase) GetUserCampaignEngagement(ctx context.Context, userI
 }
 
 // GetCampaignFunnel retrieves campaign funnel data
-func (e *EngagementUseCase) GetCampaignFunnel(ctx context.Context, campaignID string) (*CampaignFunnel, error) {
+func (e *EngagementUseCase) GetCampaignFunnel(ctx context.Context, campaignID string) (*domain.CampaignFunnel, error) {
 	_ = ctx
 
-	funnel := &CampaignFunnel{
+	funnel := &domain.CampaignFunnel{
 		CampaignID: campaignID,
 	}
 

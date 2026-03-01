@@ -25,13 +25,13 @@ type Event struct {
 
 // EventHandler handles event requests
 type EventHandler struct {
-	usecase *event_usecase.EventUseCase
+	usecase event_usecase.EventUseCaseInterface
 }
 
 var eventRequestValidator = validator.New()
 
 // NewEventHandler creates a new event handler
-func NewEventHandler(uc *event_usecase.EventUseCase) *EventHandler {
+func NewEventHandler(uc event_usecase.EventUseCaseInterface) *EventHandler {
 	return &EventHandler{
 		usecase: uc,
 	}

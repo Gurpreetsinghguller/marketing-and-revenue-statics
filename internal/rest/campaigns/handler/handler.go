@@ -17,12 +17,12 @@ import (
 )
 
 type CampaignHandler struct {
-	usecase *campaign_usecase.CampaignUseCase
+	usecase campaign_usecase.CampaignUseCaseInterface
 }
 
 var requestValidator = validator.New()
 
-func NewCampaignHandler(uc *campaign_usecase.CampaignUseCase) *CampaignHandler {
+func NewCampaignHandler(uc campaign_usecase.CampaignUseCaseInterface) *CampaignHandler {
 	return &CampaignHandler{usecase: uc}
 }
 

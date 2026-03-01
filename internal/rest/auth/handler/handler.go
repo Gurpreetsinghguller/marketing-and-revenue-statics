@@ -10,13 +10,12 @@ import (
 	auth_usecase "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/auth/usecase"
 )
 
-// AuthHandler handles authentication requests
 type AuthHandler struct {
-	usecase *auth_usecase.AuthUseCase
+	usecase auth_usecase.AuthUseCaseInterface
 }
 
 // NewAuthHandler creates a new auth handler
-func NewAuthHandler(uc *auth_usecase.AuthUseCase) *AuthHandler {
+func NewAuthHandler(uc auth_usecase.AuthUseCaseInterface) *AuthHandler {
 	return &AuthHandler{
 		usecase: uc,
 	}

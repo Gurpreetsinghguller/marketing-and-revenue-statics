@@ -9,34 +9,12 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// Metrics represents campaign metrics
-type Metrics struct {
-	CTR              float64 `json:"ctr"` // Click Through Rate
-	CPC              float64 `json:"cpc"` // Cost Per Click
-	ROI              float64 `json:"roi"` // Return on Investment
-	ConversionRate   float64 `json:"conversion_rate"`
-	TotalImpressions int64   `json:"total_impressions"`
-	TotalClicks      int64   `json:"total_clicks"`
-	TotalConversions int64   `json:"total_conversions"`
-	TotalSpend       float64 `json:"total_spend"`
-	TotalRevenue     float64 `json:"total_revenue"`
-}
-
-// Report represents an analytics report
-type Report struct {
-	ID         string  `json:"id"`
-	CampaignID string  `json:"campaign_id"`
-	Period     string  `json:"period"` // daily, weekly, monthly
-	Metrics    Metrics `json:"metrics"`
-}
-
-// AnalyticsHandler handles analytics requests
 type AnalyticsHandler struct {
-	usecase *analytics_usecase.AnalyticsUseCase
+	usecase analytics_usecase.AnalyticsUseCaseInterface
 }
 
 // NewAnalyticsHandler creates a new analytics handler
-func NewAnalyticsHandler(uc *analytics_usecase.AnalyticsUseCase) *AnalyticsHandler {
+func NewAnalyticsHandler(uc analytics_usecase.AnalyticsUseCaseInterface) *AnalyticsHandler {
 	return &AnalyticsHandler{
 		usecase: uc,
 	}

@@ -13,6 +13,15 @@ type EventUseCase struct {
 	eventRepo domain.EventRepo
 }
 
+type EventUseCaseInterface interface {
+	TrackEvent(ctx context.Context, event *domain.Event) (*domain.Event, error)
+	GetEventByID(ctx context.Context, eventID string) (*domain.Event, error)
+	GetEventsByCampaign(ctx context.Context, campaignID string) ([]domain.Event, error)
+	GetEventsByUser(ctx context.Context, userID string) ([]domain.Event, error)
+	GetEventsByType(ctx context.Context, eventType domain.EventType) ([]domain.Event, error)
+	GetAggregatedMetrics(ctx context.Context, campaignID string) (map[string]interface{}, error)
+}
+
 // NewEventUseCase creates a new event usecase
 func NewEventUseCase(eventRepo domain.EventRepo) *EventUseCase {
 	return &EventUseCase{

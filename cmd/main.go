@@ -22,6 +22,7 @@ import (
 
 // TODO: Handle context cancellation and timeouts in handlers and usecases
 // TODO: Improve error handling and logging with more context (e.g. request IDs, user IDs)
+// TODO: Increase test coverage
 func main() {
 	cfg, cfgErr := config.Load(config.DefaultConfigPath)
 	if cfgErr != nil {

@@ -16,6 +16,19 @@ type CampaignUseCase struct {
 	campaignRepo domain.CampaignRepo
 }
 
+type CampaignUseCaseInterface interface {
+	CreateCampaign(ctx context.Context, campaign *domain.Campaign, userID string) (*domain.Campaign, error)
+	GetCampaignsWithFilters(ctx context.Context, userID, userRole, status string, budget *float64, isPublic *bool) ([]domain.Campaign, error)
+	GetCampaignByID(ctx context.Context, campaignID string) (*domain.Campaign, error)
+	GetAllCampaigns(ctx context.Context) ([]domain.Campaign, error)
+	GetPublicCampaigns(ctx context.Context) ([]domain.Campaign, error)
+	UpdateCampaign(ctx context.Context, campaignID string, updatedCampaign *domain.Campaign, userID, userRole string) (*domain.Campaign, error)
+	DeleteCampaignWithRole(ctx context.Context, campaignID, userID, userRole string) error
+	SearchCampaigns(ctx context.Context, query string) ([]domain.Campaign, error)
+	PatchCampaignStatus(ctx context.Context, campaignID, userID, userRole, status string) (*domain.Campaign, error)
+	EndCampaign(ctx context.Context, campaignID, userID, userRole string) (*domain.Campaign, error)
+}
+
 // NewCampaignUseCase creates a new campaign usecase
 func NewCampaignUseCase(campaignRepo domain.CampaignRepo) *CampaignUseCase {
 	return &CampaignUseCase{

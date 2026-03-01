@@ -12,11 +12,11 @@ import (
 
 // EngagementHandler handles engagement requests
 type EngagementHandler struct {
-	usecase *engagement_usecase.EngagementUseCase
+	usecase engagement_usecase.EngagementUseCaseInterface
 }
 
 // NewEngagementHandler creates a new engagement handler
-func NewEngagementHandler(uc *engagement_usecase.EngagementUseCase) *EngagementHandler {
+func NewEngagementHandler(uc engagement_usecase.EngagementUseCaseInterface) *EngagementHandler {
 	return &EngagementHandler{
 		usecase: uc,
 	}

@@ -74,8 +74,34 @@ gofmt -w ./cmd ./internal
 Build binaries:
 ```bash
 go build -o bin/statistics ./cmd/statistics
-go build -o bin/tokengen ./cmd/tokengen
 ```
 
 ### OpenAPI Spec
 The OpenAPI spec is served at `http://localhost:8080/api/v1/docs` when the server is running, or import [api/openapi.yaml](api/openapi.yaml) into Postman to generate requests for all endpoints.
+
+
+// ...existing code...
+
+## Running tests
+
+Run unit tests locally:
+```bash
+go test -v ./...
+```
+
+Generate coverage using the standard Go tooling:
+
+- Create a coverage profile:
+```bash
+go test -v -coverprofile=coverage.out ./...
+```
+
+- Show function-level coverage summary:
+```bash
+go tool cover -func=coverage.out
+```
+
+- Generate an HTML coverage report:
+```bash
+go tool cover -html=coverage.out -o coverage.html
+```

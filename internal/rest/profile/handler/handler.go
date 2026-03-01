@@ -11,11 +11,11 @@ import (
 
 // ProfileHandler handles profile requests
 type ProfileHandler struct {
-	usecase *profile_usecase.ProfileUseCase
+	usecase profile_usecase.ProfileUseCaseInterface
 }
 
 // NewProfileHandler creates a new profile handler
-func NewProfileHandler(uc *profile_usecase.ProfileUseCase) *ProfileHandler {
+func NewProfileHandler(uc profile_usecase.ProfileUseCaseInterface) *ProfileHandler {
 	return &ProfileHandler{
 		usecase: uc,
 	}

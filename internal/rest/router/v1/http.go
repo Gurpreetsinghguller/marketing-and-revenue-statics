@@ -32,12 +32,12 @@ func NewRouter() *Router {
 
 // InitHTTPRoutes initializes all HTTP routes with handler instances
 func (r *Router) InitHTTPRoutes(
-	authUC *auth_usecase.AuthUseCase,
-	profileUC *profile_usecase.ProfileUseCase,
-	campaignUC *campaign_usecase.CampaignUseCase,
-	eventUC *event_usecase.EventUseCase,
-	analyticsUC *analytics_usecase.AnalyticsUseCase,
-	engagementUC *engagement_usecase.EngagementUseCase,
+	authUC auth_usecase.AuthUseCaseInterface,
+	profileUC profile_usecase.ProfileUseCaseInterface,
+	campaignUC campaign_usecase.CampaignUseCaseInterface,
+	eventUC event_usecase.EventUseCaseInterface,
+	analyticsUC analytics_usecase.AnalyticsUseCaseInterface,
+	engagementUC engagement_usecase.EngagementUseCaseInterface,
 ) *mux.Router {
 	// Initialize handlers with their usecases
 	authHandler := auth_handler.NewAuthHandler(authUC)
