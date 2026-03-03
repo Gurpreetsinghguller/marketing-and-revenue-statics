@@ -35,7 +35,7 @@ A production-grade backend service for tracking marketing campaign performance, 
 
 ---
 ## Layered Architecture Here
-[Layered-Architecture-Here](development/layeredArchitecture.md)
+[here](development/layeredArchitecture.md)
 
 ### Object Classification
 
