@@ -2,21 +2,6 @@
 
 A production-grade backend service for tracking marketing campaign performance, user engagement, and revenue analytics. Built with Go and architected using Clean Architecture, Domain-Driven Design, and SOLID principles.
 
----
-
-## Problem Statement
-
-Organizations struggle to efficiently track, analyze, and manage their marketing campaigns across multiple channels. Current solutions lack:
-
-- **Unified event tracking**: Scattered event data from multiple sources (impressions, clicks, conversions) without a centralized system
-- **Real-time analytics**: Inability to quickly generate insights on campaign performance across dimensions (time, channel, audience)
-- **Scalability**: Systems that cannot handle high-volume event ingestion without performance degradation
-- **Access control**: Lack of granular role-based access to campaign and analytics data
-- **Extensibility**: Tightly-coupled systems that are difficult to adapt to changing data sources or storage backends
-
-This API provides a scalable, maintainable solution for aggregating marketing events, tracking user engagement funnels, and generating actionable campaign analytics with role-based access control.
-
----
 
 ## Core Features
 
