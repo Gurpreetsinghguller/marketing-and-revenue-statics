@@ -14,6 +14,7 @@ type Config struct {
 	Log       LogConfig       `yaml:"log"`
 	Auth      AuthConfig      `yaml:"auth"`
 	RateLimit RateLimitConfig `yaml:"rate_limit"`
+	Broker    BrokerConfig    `yaml:"broker"`
 }
 
 type ServerConfig struct {
@@ -33,6 +34,14 @@ type RateLimitConfig struct {
 	WindowSeconds int `yaml:"window_seconds"`
 }
 
+type BrokerConfig struct {
+	Type     string `yaml:"type"`      // "mqtt", "kafka", etc.
+	URL      string `yaml:"url"`       // Broker connection URL
+	ClientID string `yaml:"client_id"` // Client ID for broker
+	Topic    string `yaml:"topic"`     // Topic to subscribe to
+	Enabled  bool   `yaml:"enabled"`   // Whether to enable broker consumption
+}
+
 func Default() *Config {
 	return &Config{
 		Server: ServerConfig{Port: "8080"},
@@ -41,6 +50,13 @@ func Default() *Config {
 		RateLimit: RateLimitConfig{
 			MaxRequests:   100,
 			WindowSeconds: 60,
+		},
+		Broker: BrokerConfig{
+			Type:     "mqtt",
+			URL:      "tcp://localhost:1883",
+			ClientID: "marketing-app",
+			Topic:    "events",
+			Enabled:  false,
 		},
 	}
 }
@@ -78,6 +94,18 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.RateLimit.WindowSeconds <= 0 {
 		cfg.RateLimit.WindowSeconds = 60
+	}
+	if strings.TrimSpace(cfg.Broker.Type) == "" {
+		cfg.Broker.Type = "mqtt"
+	}
+	if strings.TrimSpace(cfg.Broker.URL) == "" {
+		cfg.Broker.URL = "tcp://localhost:1883"
+	}
+	if strings.TrimSpace(cfg.Broker.ClientID) == "" {
+		cfg.Broker.ClientID = "marketing-app"
+	}
+	if strings.TrimSpace(cfg.Broker.Topic) == "" {
+		cfg.Broker.Topic = "events"
 	}
 
 	return cfg, nil

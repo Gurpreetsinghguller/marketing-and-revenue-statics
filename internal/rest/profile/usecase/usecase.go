@@ -8,17 +8,18 @@ import (
 	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/domain"
 )
 
-// ProfileUseCase handles user profile business logic
-type ProfileUseCase struct {
-	userRepo domain.UserRepo
-}
 type ProfileUseCaseInterface interface {
 	GetProfile(ctx context.Context, userID string) (*domain.User, error)
 	UpdateProfile(ctx context.Context, userID string, updates *domain.User) (*domain.User, error)
 }
 
+// ProfileUseCase handles user profile business logic
+type ProfileUseCase struct {
+	userRepo domain.UserRepo
+}
+
 // NewProfileUseCase creates a new profile usecase
-func NewProfileUseCase(userRepo domain.UserRepo) *ProfileUseCase {
+func NewProfileUseCase(userRepo domain.UserRepo) ProfileUseCaseInterface {
 	return &ProfileUseCase{
 		userRepo: userRepo,
 	}
