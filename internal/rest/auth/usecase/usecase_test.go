@@ -2,6 +2,7 @@ package usecase_test
 
 import (
 	"context"
+	"errors"
 	"os"
 	"testing"
 	"time"
@@ -13,6 +14,25 @@ import (
 	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/auth/usecase"
 	tmock "github.com/stretchr/testify/mock"
 )
+
+type tokenMachineStub struct {
+	generateFn func(userID string, role string) (string, error)
+	validateFn func(token string) (string, string, error)
+}
+
+func (s tokenMachineStub) GenerateToken(userID string, role string) (string, error) {
+	if s.generateFn != nil {
+		return s.generateFn(userID, role)
+	}
+	return "stub-token", nil
+}
+
+func (s tokenMachineStub) ValidateToken(token string) (string, string, error) {
+	if s.validateFn != nil {
+		return s.validateFn(token)
+	}
+	return "", "", nil
+}
 
 func TestAuthUseCase_Register_Success(t *testing.T) {
 	os.Setenv("JWT_SECRET", "testsecret")
@@ -31,7 +51,7 @@ func TestAuthUseCase_Register_Success(t *testing.T) {
 		}
 	}).Return(nil)
 
-	uc := usecase.NewAuthUseCase(repo, nil)
+	uc := usecase.NewAuthUseCase(repo, tokenMachineStub{})
 
 	user := &domain.User{
 		Email:    "a@b.com",
@@ -53,7 +73,7 @@ func TestAuthUseCase_Register_EmailExists(t *testing.T) {
 	repo := mocks.NewUserRepo(t)
 	repo.On("EmailExists", "a@b.com").Return(true)
 
-	uc := usecase.NewAuthUseCase(repo, nil)
+	uc := usecase.NewAuthUseCase(repo, tokenMachineStub{})
 
 	user := &domain.User{Email: "a@b.com", Password: "secret", Name: "X"}
 	_, err := uc.Register(context.Background(), user)
@@ -72,7 +92,7 @@ func TestAuthUseCase_Login_Success(t *testing.T) {
 	repo := mocks.NewUserRepo(t)
 	repo.On("GetByEmail", "a@b.com").Return(&domain.User{ID: "u1", Email: "a@b.com", Password: string(hash), Role: domain.MarketerRole}, nil)
 
-	uc := usecase.NewAuthUseCase(repo, nil)
+	uc := usecase.NewAuthUseCase(repo, tokenMachineStub{})
 	cred := &domain.User{Email: "a@b.com", Password: "secret"}
 	res, err := uc.Login(context.Background(), cred)
 	if err != nil {
@@ -90,10 +110,35 @@ func TestAuthUseCase_Login_InvalidCredentials(t *testing.T) {
 	repo := mocks.NewUserRepo(t)
 	repo.On("GetByEmail", "a@b.com").Return(&domain.User{ID: "u1", Email: "a@b.com", Password: string(hash)}, nil)
 
-	uc := usecase.NewAuthUseCase(repo, nil)
+	uc := usecase.NewAuthUseCase(repo, tokenMachineStub{})
 	cred := &domain.User{Email: "a@b.com", Password: "secret"}
 	_, err := uc.Login(context.Background(), cred)
 	if err == nil {
 		t.Fatal("expected error for invalid credentials")
+	}
+}
+
+func TestAuthUseCase_Register_RollbackOnTokenFailure(t *testing.T) {
+	repo := mocks.NewUserRepo(t)
+	repo.On("EmailExists", "rollback@test.com").Return(false)
+	repo.On("Create", tmock.AnythingOfType("*domain.User")).Return(nil)
+	repo.On("Delete", tmock.AnythingOfType("string")).Return(nil)
+
+	uc := usecase.NewAuthUseCase(repo, tokenMachineStub{
+		generateFn: func(userID string, role string) (string, error) {
+			return "", errors.New("token generation failed")
+		},
+	})
+
+	user := &domain.User{
+		Email:    "rollback@test.com",
+		Password: "secret",
+		Name:     "Rollback",
+		Role:     domain.MarketerRole,
+	}
+
+	_, err := uc.Register(context.Background(), user)
+	if err == nil {
+		t.Fatal("expected error when token generation fails")
 	}
 }

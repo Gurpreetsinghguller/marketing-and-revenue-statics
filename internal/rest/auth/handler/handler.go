@@ -54,10 +54,10 @@ func (h *AuthHandler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := map[string]interface{}{
-		"message": "User registered successfully",
-		"user_id": result.UserID,
-		"token":   result.Token,
+	response := RegisterResponse{
+		Message: "User registered successfully",
+		UserID:  result.UserID,
+		Token:   result.Token,
 	}
 
 	w.WriteHeader(http.StatusCreated)
@@ -91,10 +91,10 @@ func (h *AuthHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusUnauthorized)
 		return
 	}
-	response := map[string]interface{}{
-		"message": "Login successful",
-		"token":   result.Token,
-		"user":    result.User,
+	response := LoginResponse{
+		Message: "Login successful",
+		Token:   result.Token,
+		User:    result.User,
 	}
 
 	json.NewEncoder(w).Encode(response)

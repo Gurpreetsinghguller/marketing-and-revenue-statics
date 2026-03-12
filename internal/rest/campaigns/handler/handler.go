@@ -212,7 +212,7 @@ func (h *CampaignHandler) DeleteCampaignHandler(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]string{"message": "Campaign deleted successfully"})
+	json.NewEncoder(w).Encode(DeleteCampaignResponse{Message: "Campaign deleted successfully"})
 }
 
 func (h *CampaignHandler) GetCampaignPreviewHandler(w http.ResponseWriter, r *http.Request) {

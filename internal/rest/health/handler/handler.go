@@ -18,9 +18,9 @@ func NewHealthHandler() *HealthHandler {
 func (h *HealthHandler) GetHealthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	resp := map[string]interface{}{
-		"status": "ok",
-		"time":   time.Now().UTC().Format(time.RFC3339),
+	resp := HealthResponse{
+		Status: "ok",
+		Time:   time.Now().UTC().Format(time.RFC3339),
 	}
 
 	json.NewEncoder(w).Encode(resp)

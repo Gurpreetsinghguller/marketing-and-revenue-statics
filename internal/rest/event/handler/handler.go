@@ -6,22 +6,11 @@ import (
 	"errors"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/domain"
 	event_usecase "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/event/usecase"
 	"github.com/go-playground/validator/v10"
 )
-
-// Event represents a user interaction event
-type Event struct {
-	ID         string                 `json:"id"`
-	CampaignID string                 `json:"campaign_id"`
-	EventType  string                 `json:"event_type"` // impression, click, conversion
-	UserID     string                 `json:"user_id"`
-	Timestamp  time.Time              `json:"timestamp"`
-	MetaData   map[string]interface{} `json:"metadata"`
-}
 
 // EventHandler handles event requests
 type EventHandler struct {

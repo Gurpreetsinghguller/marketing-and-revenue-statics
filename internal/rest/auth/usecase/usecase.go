@@ -79,6 +79,9 @@ func (u *AuthUseCase) Register(ctx context.Context, user *domain.User) (*Registe
 
 	token, err := u.tokenMachine.GenerateToken(newUser.ID, newUser.Role.String())
 	if err != nil {
+		if rollbackErr := u.userRepo.Delete(newUser.ID); rollbackErr != nil {
+			return nil, fmt.Errorf("failed to generate auth token: %w (rollback failed: %v)", err, rollbackErr)
+		}
 		return nil, fmt.Errorf("failed to generate auth token: %w", err)
 	}
 
