@@ -21,6 +21,7 @@ type MQTTBroker struct {
 	log       *logrus.Logger
 }
 
+// liskov substitution principle: MQTTBroker can be used wherever EventBroker is expected
 var _ event.EventBroker = (*MQTTBroker)(nil)
 
 func NewBroker(brokerURL, clientID, topic string) event.EventBroker {
@@ -33,31 +34,30 @@ func NewBroker(brokerURL, clientID, topic string) event.EventBroker {
 }
 
 func (m *MQTTBroker) Start(ctx context.Context, handler event.EventHandler) error {
-	fmt.Println("MQTT CREDS", m.brokerURL, m.clientID)
 	opts := mqtt.NewClientOptions()
 	opts.AddBroker(m.brokerURL)
 	opts.SetClientID(m.clientID)
-	opts.SetCleanSession(true) // ← ADD THIS: clears ghost sessions
+	opts.SetCleanSession(true)
 	opts.SetAutoReconnect(true)
 	opts.SetMaxReconnectInterval(time.Second * 10)
-	opts.SetConnectRetryInterval(time.Second * 3) // ← ADD THIS
+	opts.SetConnectRetryInterval(time.Second * 3)
 	opts.SetMessageChannelDepth(1000)
-	// opts.SetUsername("username")
-	// opts.SetPassword("password")
 
 	opts.SetDefaultPublishHandler(func(client mqtt.Client, msg mqtt.Message) {
 		m.processMessage(client, msg, handler)
 	})
 
-	// ← ADD THIS: re-subscribe after every reconnect
+	// Re-subscribe after every reconnect
 	opts.SetOnConnectHandler(func(client mqtt.Client) {
 		m.log.Info("MQTT connected, subscribing to topic...")
 		if token := client.Subscribe(m.topic, 1, nil); token.Wait() && token.Error() != nil {
-			m.log.WithError(token.Error()).Error("failed to re-subscribe after reconnect")
+			m.log.WithError(token.Error()).Error("failed to subscribe to topic")
+		} else {
+			m.log.WithField("topic", m.topic).Info("successfully subscribed to topic")
 		}
 	})
 
-	// ← ADD THIS: log disconnections
+	// Log disconnections
 	opts.SetConnectionLostHandler(func(client mqtt.Client, err error) {
 		m.log.WithError(err).Warn("MQTT connection lost, will auto-reconnect...")
 	})
@@ -73,8 +73,13 @@ func (m *MQTTBroker) Start(ctx context.Context, handler event.EventHandler) erro
 		"client_id":  m.clientID,
 	}).Info("MQTT broker connected and listening")
 
-	// NOTE: Remove Subscribe from here — OnConnectHandler handles it now
-	// This avoids double-subscribing on first connect
+	// Wait briefly to ensure OnConnectHandler subscription completes
+	time.Sleep(500 * time.Millisecond)
+
+	// Verify subscription succeeded
+	if !m.IsConnected() {
+		return fmt.Errorf("MQTT client connection lost after startup")
+	}
 
 	return nil
 }
@@ -97,27 +102,6 @@ func (m *MQTTBroker) Health(ctx context.Context) error {
 	if m.client == nil || !m.client.IsConnected() {
 		return fmt.Errorf("MQTT broker is not connected")
 	}
-	return nil
-}
-
-// Publish sends an event to the MQTT broker
-func (m *MQTTBroker) Publish(ctx context.Context, event *event.Event) error {
-	payload, err := json.Marshal(event)
-	if err != nil {
-		return fmt.Errorf("failed to marshal event: %w", err)
-	}
-
-	token := m.client.Publish(m.topic, 1, false, payload)
-	if token.Wait() && token.Error() != nil {
-		return fmt.Errorf("failed to publish event: %w", token.Error())
-	}
-
-	m.log.WithFields(logrus.Fields{
-		"topic":     m.topic,
-		"client_id": m.clientID,
-		"event_id":  event.ID,
-	}).Info("Event published to MQTT broker")
-
 	return nil
 }
 

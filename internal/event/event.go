@@ -46,7 +46,8 @@ type EventBroker interface {
 	Close() error
 
 	// Publish sends an event to the broker (optional, for some implementations)
-	Publish(ctx context.Context, event *Event) error
+	// right now we are not publishing events from this service, but we can add this in the future if needed
+	// Publish(ctx context.Context, event *Event) error
 
 	// Health checks broker connectivity
 	Health(ctx context.Context) error
