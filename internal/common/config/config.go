@@ -40,6 +40,7 @@ type BrokerConfig struct {
 	URL      string `yaml:"url"`       // Broker connection URL
 	ClientID string `yaml:"client_id"` // Client ID for broker
 	Topic    string `yaml:"topic"`     // Topic to subscribe to
+	QoS      int    `yaml:"qos"`       // Quality of Service level (for MQTT)
 }
 
 func Default() *Config {
@@ -58,6 +59,7 @@ func Default() *Config {
 			URL:      "tcp://localhost:1883",
 			ClientID: "marketing-app",
 			Topic:    "events",
+			QoS:      1,
 		},
 	}
 }

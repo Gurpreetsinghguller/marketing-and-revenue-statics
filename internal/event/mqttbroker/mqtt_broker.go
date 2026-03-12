@@ -19,17 +19,19 @@ type MQTTBroker struct {
 	topic     string
 	clientID  string
 	log       *logrus.Logger
+	QoS       int
 }
 
 // liskov substitution principle: MQTTBroker can be used wherever EventBroker is expected
 var _ event.EventBroker = (*MQTTBroker)(nil)
 
-func NewBroker(brokerURL, clientID, topic string) event.EventBroker {
+func NewBroker(brokerURL, clientID, topic string, qos int) event.EventBroker {
 	return &MQTTBroker{
 		brokerURL: brokerURL,
 		clientID:  clientID,
 		topic:     topic,
 		log:       logger.Get(),
+		QoS:       qos,
 	}
 }
 
@@ -50,7 +52,7 @@ func (m *MQTTBroker) Start(ctx context.Context, handler event.EventHandler) erro
 	// Re-subscribe after every reconnect
 	opts.SetOnConnectHandler(func(client mqtt.Client) {
 		m.log.Info("MQTT connected, subscribing to topic...")
-		if token := client.Subscribe(m.topic, 1, nil); token.Wait() && token.Error() != nil {
+		if token := client.Subscribe(m.topic, uint8(m.QoS), nil); token.Wait() && token.Error() != nil {
 			m.log.WithError(token.Error()).Error("failed to subscribe to topic")
 		} else {
 			m.log.WithField("topic", m.topic).Info("successfully subscribed to topic")
