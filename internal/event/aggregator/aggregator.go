@@ -10,6 +10,15 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type Aggregator interface {
+	ProcessEvent(ctx context.Context, event *domain.Event) error
+	FlushMetrics(ctx context.Context) error
+	LoadDailyMetrics(campaignID, date string) *domain.CampaignMetrics
+	LoadHourlyMetrics(campaignID, date string) *domain.CampaignMetrics
+	GetHourlyMetrics(campaignID, hour string) *domain.CampaignMetrics
+	GetDailyMetrics(campaignID, date string) *domain.CampaignMetrics
+}
+
 // MetricsAggregator computes metrics at event-time
 type MetricsAggregator struct {
 	metricsRepo domain.MetricsRepo

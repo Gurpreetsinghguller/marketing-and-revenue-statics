@@ -37,7 +37,9 @@ func (s *EventService) Start(ctx context.Context) error {
 	return s.broker.Start(ctx, s.handleEvent)
 }
 
-// handleEvent processes each event received from broker
+// This is handler that processes event handler contains the logic for processing received events.
+// Defines the actions taken in response to an event.
+// Implements business rules or workflows
 func (s *EventService) handleEvent(ctx context.Context, event *event.Event) error {
 	// 1. Persist event to DB
 	// we have to adapt the Broker Event to our domain Event Model

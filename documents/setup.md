@@ -73,7 +73,7 @@ gofmt -w ./cmd ./internal
 
 Build binaries:
 ```bash
-go build -o bin/statistics ./cmd/statistics
+go build -o .bin/app ./cmd/main.go
 ```
 
 ### OpenAPI Spec

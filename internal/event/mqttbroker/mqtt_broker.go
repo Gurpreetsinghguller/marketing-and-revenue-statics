@@ -46,7 +46,7 @@ func (m *MQTTBroker) Start(ctx context.Context, handler event.EventHandler) erro
 	opts.SetMessageChannelDepth(1000)
 
 	opts.SetDefaultPublishHandler(func(client mqtt.Client, msg mqtt.Message) {
-		m.processMessage(client, msg, handler)
+		m.dispatchMessage(client, msg, handler)
 	})
 
 	// Re-subscribe after every reconnect
@@ -107,7 +107,12 @@ func (m *MQTTBroker) Health(ctx context.Context) error {
 	return nil
 }
 
-func (m *MQTTBroker) processMessage(client mqtt.Client, msg mqtt.Message, handler event.EventHandler) {
+// This is my "Dispatch" method that processes incoming MQTT messages and converts them to events
+// isn't my dispatch method just the handler for MQTT messages? I think it is. It takes the raw MQTT message,
+// extracts the payload, and then processes it as an event. So it's really the core of how we handle
+//
+//	incoming data from MQTT and turn it into something our system can work with.
+func (m *MQTTBroker) dispatchMessage(client mqtt.Client, msg mqtt.Message, handler event.EventHandler) {
 	var event event.Event
 	m.log.WithFields(logrus.Fields{
 		"topic":      m.topic,

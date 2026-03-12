@@ -29,6 +29,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// TODO : Add graceful shutdown with context cancellation and waitgroups
+
+// TODO: Introduce a cache to store aggregated metrics for faster retrieval in analytics endpoints
+// The Aggregator should do 2 things:
+
 // TODO: Handle context cancellation and timeouts in handlers and usecases
 // TODO: Improve error handling and logging with more context (e.g. request IDs, user IDs)
 // TODO: Increase test coverage
@@ -139,7 +144,6 @@ func main() {
 
 // This is Factory Pattern
 func InitializeBroker(cfg *config.Config) (event.EventBroker, error) {
-	// Initialize broker based on configa
 	var broker event.EventBroker
 	switch strings.ToLower(cfg.Broker.Type) {
 	case "mqtt":
