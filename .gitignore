@@ -4,3 +4,5 @@ data/*
 config/config.yml
 shared/secret
 *.json
+./config/*.yml
+./config/*.yaml

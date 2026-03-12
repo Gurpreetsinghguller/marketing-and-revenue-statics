@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/middleware"
 	analytics_handler "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/analytics/handler"
 	analytics_usecase "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/analytics/usecase"
 	auth_handler "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/auth/handler"
@@ -14,19 +15,22 @@ import (
 	health_handler "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/health/handler"
 	profile_handler "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/profile/handler"
 	profile_usecase "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/profile/usecase"
+	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/tokenmachine"
 
 	"github.com/gorilla/mux"
 )
 
 // Router represents the HTTP router
 type Router struct {
-	router *mux.Router
+	router       *mux.Router
+	tokenMachine tokenmachine.TokenMachine
 }
 
 // NewRouter creates a new router instance
-func NewRouter() *Router {
+func NewRouter(tokenMachine tokenmachine.TokenMachine) *Router {
 	return &Router{
-		router: mux.NewRouter(),
+		router:       mux.NewRouter(),
+		tokenMachine: tokenMachine,
 	}
 }
 
@@ -39,6 +43,11 @@ func (r *Router) InitHTTPRoutes(
 	analyticsUC analytics_usecase.AnalyticsUseCaseInterface,
 	engagementUC engagement_usecase.EngagementUseCaseInterface,
 ) *mux.Router {
+
+	// Add global middleware
+	r.router.Use(middleware.LoggingMiddleware)
+	r.router.Use(middleware.CORSMiddleware)
+
 	// Initialize handlers with their usecases
 	authHandler := auth_handler.NewAuthHandler(authUC)
 	profileHandler := profile_handler.NewProfileHandler(profileUC)
@@ -52,11 +61,11 @@ func (r *Router) InitHTTPRoutes(
 
 	r.registerCoreRoutes(v1, healthHandler)
 	r.registerAuthRoutes(v1, authHandler)
-	r.registerProfileRoutes(v1, profileHandler)
-	r.registerCampaignRoutes(v1, campaignHandler)
-	r.registerEventRoutes(v1, eventHandler)
-	r.registerAnalyticsRoutes(v1, analyticsHandler)
-	r.registerEngagementRoutes(v1, engagementHandler)
+	r.registerProfileRoutes(v1, profileHandler, r.tokenMachine)
+	r.registerCampaignRoutes(v1, campaignHandler, r.tokenMachine)
+	r.registerEventRoutes(v1, eventHandler, r.tokenMachine)
+	r.registerAnalyticsRoutes(v1, analyticsHandler, r.tokenMachine)
+	r.registerEngagementRoutes(v1, engagementHandler, r.tokenMachine)
 
 	return r.router
 }

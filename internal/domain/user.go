@@ -10,6 +10,10 @@ const (
 	AnalystRole  Role = "analyst"
 )
 
+func (r Role) String() string {
+	return string(r)
+}
+
 type User struct {
 	ID        string    `json:"id"`
 	Email     string    `json:"email"`

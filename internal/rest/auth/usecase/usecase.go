@@ -6,25 +6,16 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"os"
-	"strings"
-	"time"
 
 	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/domain"
-	"github.com/golang-jwt/jwt/v5"
+	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/tokenmachine"
 	"golang.org/x/crypto/bcrypt"
 )
 
-const tokenTTL = 24 * time.Hour
-
-type tokenClaims struct {
-	Role string `json:"role"`
-	jwt.RegisteredClaims
-}
-
 // AuthUseCase handles authentication business logic
 type AuthUseCase struct {
-	userRepo domain.UserRepo
+	userRepo     domain.UserRepo
+	tokenMachine tokenmachine.TokenMachine
 }
 
 type AuthUseCaseInterface interface {
@@ -32,9 +23,10 @@ type AuthUseCaseInterface interface {
 	Login(ctx context.Context, credentials *domain.User) (*LoginResponse, error)
 }
 
-func NewAuthUseCase(userRepo domain.UserRepo) *AuthUseCase {
+func NewAuthUseCase(userRepo domain.UserRepo, tokenMachine tokenmachine.TokenMachine) AuthUseCaseInterface {
 	return &AuthUseCase{
-		userRepo: userRepo,
+		userRepo:     userRepo,
+		tokenMachine: tokenMachine,
 	}
 }
 
@@ -85,7 +77,7 @@ func (u *AuthUseCase) Register(ctx context.Context, user *domain.User) (*Registe
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
 
-	token, err := generateJWT(newUser.ID, newUser.Role)
+	token, err := u.tokenMachine.GenerateToken(newUser.ID, newUser.Role.String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate auth token: %w", err)
 	}
@@ -117,7 +109,7 @@ func (u *AuthUseCase) Login(ctx context.Context, credentials *domain.User) (*Log
 		return nil, errors.New("invalid email or password")
 	}
 
-	token, err := generateJWT(user.ID, user.Role)
+	token, err := u.tokenMachine.GenerateToken(user.ID, user.Role.String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate auth token: %w", err)
 	}
@@ -135,38 +127,4 @@ func generateUserID() (string, error) {
 	}
 
 	return fmt.Sprintf("user_%s", hex.EncodeToString(idBytes)), nil
-}
-
-func generateJWT(userID string, role domain.Role) (string, error) {
-	secret := loadJWTSecret()
-	if secret == "" {
-		return "", errors.New("jwt secret is missing")
-	}
-
-	now := time.Now().UTC()
-	claims := tokenClaims{
-		Role: string(role),
-		RegisteredClaims: jwt.RegisteredClaims{
-			Subject:   userID,
-			IssuedAt:  jwt.NewNumericDate(now),
-			NotBefore: jwt.NewNumericDate(now),
-			ExpiresAt: jwt.NewNumericDate(now.Add(tokenTTL)),
-		},
-	}
-
-	jwtToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return jwtToken.SignedString([]byte(secret))
-}
-
-func loadJWTSecret() string {
-	if secret := strings.TrimSpace(os.Getenv("JWT_SECRET")); secret != "" {
-		return secret
-	}
-
-	data, err := os.ReadFile("shared/secret")
-	if err != nil {
-		return ""
-	}
-
-	return strings.TrimSpace(string(data))
 }

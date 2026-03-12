@@ -3,16 +3,17 @@ package v1
 import (
 	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/middleware"
 	analytics_handler "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/analytics/handler"
+	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/tokenmachine"
 	"github.com/gorilla/mux"
 )
 
-func (r *Router) registerAnalyticsRoutes(v1 *mux.Router, analyticsHandler *analytics_handler.AnalyticsHandler) {
+func (r *Router) registerAnalyticsRoutes(v1 *mux.Router, analyticsHandler *analytics_handler.AnalyticsHandler, tokenMachine tokenmachine.TokenMachine) {
 	analytics := v1.PathPrefix("/analytics").Subrouter()
 
 	analytics.HandleFunc("/public/stats", analyticsHandler.GetPublicStatsHandler).Methods("GET")
 
 	analyticsAuth := analytics.PathPrefix("").Subrouter()
-	analyticsAuth.Use(middleware.AuthMiddleware)
+	analyticsAuth.Use(middleware.AuthMiddleware(tokenMachine))
 	analyticsAuth.HandleFunc("/reports", analyticsHandler.GetAnalyticsReportHandler).Methods("GET")
 	// TODO: these 3 APIS can be optimized to a single API with a query parameter for the time range (daily, weekly, monthly)
 	analyticsAuth.HandleFunc("/reports/daily", analyticsHandler.GetDailyReportHandler).Methods("GET")

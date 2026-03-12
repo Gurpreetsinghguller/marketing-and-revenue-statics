@@ -31,7 +31,7 @@ func TestAuthUseCase_Register_Success(t *testing.T) {
 		}
 	}).Return(nil)
 
-	uc := usecase.NewAuthUseCase(repo)
+	uc := usecase.NewAuthUseCase(repo, nil)
 
 	user := &domain.User{
 		Email:    "a@b.com",
@@ -53,7 +53,7 @@ func TestAuthUseCase_Register_EmailExists(t *testing.T) {
 	repo := mocks.NewUserRepo(t)
 	repo.On("EmailExists", "a@b.com").Return(true)
 
-	uc := usecase.NewAuthUseCase(repo)
+	uc := usecase.NewAuthUseCase(repo, nil)
 
 	user := &domain.User{Email: "a@b.com", Password: "secret", Name: "X"}
 	_, err := uc.Register(context.Background(), user)
@@ -72,7 +72,7 @@ func TestAuthUseCase_Login_Success(t *testing.T) {
 	repo := mocks.NewUserRepo(t)
 	repo.On("GetByEmail", "a@b.com").Return(&domain.User{ID: "u1", Email: "a@b.com", Password: string(hash), Role: domain.MarketerRole}, nil)
 
-	uc := usecase.NewAuthUseCase(repo)
+	uc := usecase.NewAuthUseCase(repo, nil)
 	cred := &domain.User{Email: "a@b.com", Password: "secret"}
 	res, err := uc.Login(context.Background(), cred)
 	if err != nil {
@@ -90,7 +90,7 @@ func TestAuthUseCase_Login_InvalidCredentials(t *testing.T) {
 	repo := mocks.NewUserRepo(t)
 	repo.On("GetByEmail", "a@b.com").Return(&domain.User{ID: "u1", Email: "a@b.com", Password: string(hash)}, nil)
 
-	uc := usecase.NewAuthUseCase(repo)
+	uc := usecase.NewAuthUseCase(repo, nil)
 	cred := &domain.User{Email: "a@b.com", Password: "secret"}
 	_, err := uc.Login(context.Background(), cred)
 	if err == nil {

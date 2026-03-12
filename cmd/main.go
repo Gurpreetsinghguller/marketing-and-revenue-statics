@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/common/config"
@@ -11,7 +12,6 @@ import (
 	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/event/aggregator"
 	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/event/eventservice"
 	mqtt "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/event/mqttbroker"
-	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/middleware"
 	campaign_repo "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/persistence/campaign"
 	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/persistence/db"
 	event_repo "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/persistence/event"
@@ -24,6 +24,8 @@ import (
 	event_usecase "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/event/usecase"
 	profile_usecase "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/profile/usecase"
 	v1 "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/router/v1"
+	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/tokenmachine"
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 )
 
@@ -39,22 +41,36 @@ func init() {
 	log = logger.Get()
 	log.Info("application initializing")
 
-	cfg, cfgErr := config.Load(config.DefaultConfigPath)
+	localCfg, cfgErr := config.Load(config.DefaultConfigPath)
 	if cfgErr != nil {
 		log.WithError(cfgErr).Warn("failed to load config file; using defaults")
-		cfg = config.Default()
+		localCfg = config.Default()
 	}
+	cfg = localCfg
 	logger.Configure(cfg.Log.Level)
+
+	if _, err := os.ReadFile(cfg.Auth.SecretFile); err != nil && err != os.ErrNotExist {
+		randomSecret := uuid.New().String()
+		if writeErr := os.WriteFile(cfg.Auth.SecretFile, []byte(randomSecret), 0600); writeErr != nil {
+			log.WithError(writeErr).Error("failed to create JWT secret file")
+		} else {
+			log.Info("JWT secret file created successfully")
+		}
+	} else {
+		log.WithError(err).Warn("failed to read JWT secret from file")
+	}
 }
 
-// The question is, Do we want to not start REST server if broker fails to start?
+// The question is, Do we want to stop the service if any one interface fails to initialize?
 //
-//	Or do we want to start REST server and log broker errors but keep REST functional?
+//	Or do we want to start REST server and log errors but keep REST functional?
 func main() {
-
 	// Initialize database
 	storage := db.NewStorageMgr()
 	defer storage.Close()
+
+	// initialize token machine and pass it to router and usecases that need it
+	tokenMachine := tokenmachine.NewJWTTokenMachine(cfg)
 
 	/// -----------------------STORAGE will act as Strategy Pattern for Repositories-----------------------
 	// We can easily swap out the storage implementation (e.g. switch from in-memory to SQL) without changing repository logic
@@ -62,7 +78,7 @@ func main() {
 	campaignRepo := campaign_repo.NewCampaignRepository(storage)
 	eventRepo := event_repo.NewEventRepository(storage)
 
-	authUC := auth_usecase.NewAuthUseCase(userRepo)
+	authUC := auth_usecase.NewAuthUseCase(userRepo, tokenMachine)
 	profileUC := profile_usecase.NewProfileUseCase(userRepo)
 	campaignUC := campaign_usecase.NewCampaignUseCase(campaignRepo)
 	eventUC := event_usecase.NewEventUseCase(eventRepo)
@@ -92,7 +108,7 @@ func main() {
 	}()
 
 	// Initialize router and setup routes
-	router := v1.NewRouter()
+	router := v1.NewRouter(tokenMachine)
 	muxRouter := router.InitHTTPRoutes(
 		authUC,
 		profileUC,
@@ -101,10 +117,6 @@ func main() {
 		analyticsUC,
 		engagementUC,
 	)
-
-	// Add global middleware
-	muxRouter.Use(middleware.LoggingMiddleware)
-	muxRouter.Use(middleware.CORSMiddleware)
 
 	// Start HTTP server
 	port := strings.TrimSpace(cfg.Server.Port)
@@ -127,7 +139,7 @@ func main() {
 
 // This is Factory Pattern
 func InitializeBroker(cfg *config.Config) (event.EventBroker, error) {
-	// Initialize broker based on config
+	// Initialize broker based on configa
 	var broker event.EventBroker
 	switch strings.ToLower(cfg.Broker.Type) {
 	case "mqtt":

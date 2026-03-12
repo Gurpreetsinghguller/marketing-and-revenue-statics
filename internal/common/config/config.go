@@ -27,6 +27,7 @@ type LogConfig struct {
 
 type AuthConfig struct {
 	SecretFile string `yaml:"secret_file"`
+	TokenTTL   string `yaml:"token_ttl"`
 }
 
 type RateLimitConfig struct {
@@ -39,14 +40,15 @@ type BrokerConfig struct {
 	URL      string `yaml:"url"`       // Broker connection URL
 	ClientID string `yaml:"client_id"` // Client ID for broker
 	Topic    string `yaml:"topic"`     // Topic to subscribe to
-	Enabled  bool   `yaml:"enabled"`   // Whether to enable broker consumption
 }
 
 func Default() *Config {
 	return &Config{
 		Server: ServerConfig{Port: "8080"},
 		Log:    LogConfig{Level: "info"},
-		Auth:   AuthConfig{SecretFile: "shared/secret"},
+		Auth: AuthConfig{
+			SecretFile: "shared/secret",
+			TokenTTL:   "24h"},
 		RateLimit: RateLimitConfig{
 			MaxRequests:   100,
 			WindowSeconds: 60,
@@ -56,7 +58,6 @@ func Default() *Config {
 			URL:      "tcp://localhost:1883",
 			ClientID: "marketing-app",
 			Topic:    "events",
-			Enabled:  false,
 		},
 	}
 }

@@ -4,17 +4,18 @@ import (
 	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/common/constant"
 	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/middleware"
 	campaign_handler "github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/rest/campaigns/handler"
+	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/tokenmachine"
 	"github.com/gorilla/mux"
 )
 
-func (r *Router) registerCampaignRoutes(v1 *mux.Router, campaignHandler *campaign_handler.CampaignHandler) {
+func (r *Router) registerCampaignRoutes(v1 *mux.Router, campaignHandler *campaign_handler.CampaignHandler, tokenMachine tokenmachine.TokenMachine) {
 	campaigns := v1.PathPrefix("/campaigns").Subrouter()
 	// campaigns.HandleFunc("", campaignHandler.ListPublicCampaigns).Methods("GET")
 
 	campaigns.HandleFunc("/preview/{id}", campaignHandler.GetCampaignPreviewHandler).Methods("GET")
 
 	campaignsAuth := campaigns.PathPrefix("").Subrouter()
-	campaignsAuth.Use(middleware.AuthMiddleware)
+	campaignsAuth.Use(middleware.AuthMiddleware(tokenMachine))
 	campaignsAuth.HandleFunc("", campaignHandler.GetCampaignsHandler).Methods("GET")
 	campaignsAuth.HandleFunc("/search", campaignHandler.SearchCampaignsHandler).Methods("GET")
 

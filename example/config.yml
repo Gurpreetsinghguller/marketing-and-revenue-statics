@@ -6,13 +6,14 @@ log:
 
 auth:
   secret_file: "shared/secret"
+  token_ttl: 24h
 
 rate_limit:
   max_requests: 100
   window_seconds: 60
+
 broker:
   type: "mqtt"
-  url: "tcp://localhost:1883"
-  client_id: "marketing-app"
-  topic: "events"
-  enabled: false  # Set to true to enable event broker consumption
+  url: "url"
+  client_id: "go-app-listener"
+  topic: "campaign-events"

@@ -86,7 +86,17 @@ func (s *EventService) Health(ctx context.Context) error {
 
 func (s *EventService) adaptEventToDomain(event *event.Event) *domain.Event {
 	return &domain.Event{
-		ID: event.ID}
+		ID:         event.ID,
+		CampaignID: event.CampaignID,
+		UserID:     event.UserID,
+		EventType:  domain.EventType(event.EventType),
+		Timestamp:  event.Timestamp,
+		Metadata: domain.Metadata{
+			Amount: event.Metadata.Amount,
+			Source: event.Metadata.Source,
+			Device: event.Metadata.Device,
+		},
+	}
 }
 
 func (s *EventService) PublishEvent(ctx context.Context, event *domain.Event) error {

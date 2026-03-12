@@ -3,17 +3,15 @@ package middleware
 import (
 	"context"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/common/config"
-	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/common/errors"
 	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/common/logger"
 	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/common/util"
-	"github.com/golang-jwt/jwt/v5"
+	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/tokenmachine"
 )
 
 var (
@@ -22,90 +20,46 @@ var (
 	appConfig      *config.Config
 )
 
-// AuthMiddleware validates JWT token and extracts user info
-func AuthMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Extract JWT token from Authorization header
-		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" {
-			http.Error(w, `{"error": "Missing authorization header"}`, http.StatusUnauthorized)
-			return
-		}
+// // AuthMiddleware validates JWT token and extracts user info
+// Middleware uses the strategy (high cohesion, low coupling)
+func AuthMiddleware(validator tokenmachine.TokenMachine) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Extract JWT token from Authorization header
+			authHeader := r.Header.Get("Authorization")
+			if authHeader == "" {
+				http.Error(w, `{"error": "Missing authorization header"}`, http.StatusUnauthorized)
+				return
+			}
 
-		// Expected format: "Bearer <token>"
-		parts := strings.Split(authHeader, " ")
-		if len(parts) != 2 || parts[0] != "Bearer" {
-			http.Error(w, `{"error": "Invalid authorization header format"}`, http.StatusUnauthorized)
-			return
-		}
+			// Expected format: "Bearer <token>"
+			parts := strings.Split(authHeader, " ")
+			if len(parts) != 2 || parts[0] != "Bearer" {
+				http.Error(w, `{"error": "Invalid authorization header format"}`, http.StatusUnauthorized)
+				return
+			}
 
-		token := parts[1]
+			token := parts[1]
 
-		// Validate token
-		userID, userRole, err := validateToken(token)
-		if err != nil {
-			middlewareLog.WithError(err).Warn("invalid or expired auth token")
-			http.Error(w, `{"error": "Invalid or expired token"}`, http.StatusUnauthorized)
-			return
-		}
+			// Validate token
+			userID, userRole, err := validator.ValidateToken(token)
+			if err != nil {
+				middlewareLog.WithError(err).Warn("invalid or expired auth token")
+				http.Error(w, `{"error": "Invalid or expired token"}`, http.StatusUnauthorized)
+				return
+			}
 
-		// Add user info to request context
-		ctx := context.WithValue(r.Context(), "user_id", userID)
-		// Also add to headers for easier access in handlers
-		r.Header.Set("X-User-ID", userID)
-		if userRole != "" {
-			r.Header.Set("X-User-Role", userRole)
-		}
+			// Add user info to request context
+			ctx := context.WithValue(r.Context(), "user_id", userID)
+			// Also add to headers for easier access in handlers
+			r.Header.Set("X-User-ID", userID)
+			if userRole != "" {
+				r.Header.Set("X-User-Role", userRole)
+			}
 
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
-}
-
-// validateToken validates a JWT token and extracts user info.
-func validateToken(token string) (string, string, error) {
-	secret := loadJWTSecret()
-	if secret == "" {
-		return "", "", errors.ErrMissingSecret
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
 	}
-
-	claims := &CustomClaims{}
-	parsed, err := jwt.ParseWithClaims(token, claims, func(t *jwt.Token) (interface{}, error) {
-		if t.Method != jwt.SigningMethodHS256 {
-			return nil, errors.ErrInvalidToken
-		}
-		return []byte(secret), nil
-	})
-	if err != nil || !parsed.Valid {
-		if err != nil {
-			middlewareLog.WithError(err).Warn("token parse failed")
-		}
-		return "", "", errors.ErrInvalidToken
-	}
-	if claims.Subject == "" {
-		return "", "", errors.ErrInvalidToken
-	}
-
-	return claims.Subject, claims.Role, nil
-}
-
-func loadJWTSecret() string {
-	if secret := strings.TrimSpace(os.Getenv("JWT_SECRET")); secret != "" {
-		return secret
-	}
-
-	cfg := getAppConfig()
-	secretPath := strings.TrimSpace(cfg.Auth.SecretFile)
-	if secretPath == "" {
-		secretPath = "shared/secret"
-	}
-
-	data, err := os.ReadFile(secretPath)
-	if err != nil {
-		middlewareLog.WithError(err).WithField("path", secretPath).Warn("failed to read jwt secret file")
-		return ""
-	}
-
-	return strings.TrimSpace(string(data))
 }
 
 // RoleMiddleware checks user role authorization
@@ -202,12 +156,6 @@ func LoggingMiddleware(next http.Handler) http.Handler {
 			"user_id":     r.Header.Get("X-User-ID"),
 		}).Info("http request")
 	})
-}
-
-// CustomClaims defines JWT claims used by the API.
-type CustomClaims struct {
-	Role string `json:"role"`
-	jwt.RegisteredClaims
 }
 
 // getClientIP extracts client IP from request
