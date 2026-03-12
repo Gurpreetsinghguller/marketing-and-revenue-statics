@@ -143,7 +143,7 @@ func InitializeBroker(cfg *config.Config) (event.EventBroker, error) {
 	var broker event.EventBroker
 	switch strings.ToLower(cfg.Broker.Type) {
 	case "mqtt":
-		broker = mqtt.NewBroker(cfg.Broker.URL, cfg.Broker.ClientID, cfg.Broker.Topic)
+		broker = mqtt.NewBroker(cfg.Broker.URL, cfg.Broker.ClientID, cfg.Broker.Topic, cfg.Broker.QoS)
 	default:
 		log.Warnf("unsupported broker type '%s'; no events will be consumed", cfg.Broker.Type)
 		return nil, nil
