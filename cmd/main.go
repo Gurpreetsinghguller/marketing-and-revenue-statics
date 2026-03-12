@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/common/config"
@@ -54,15 +55,26 @@ func init() {
 	cfg = localCfg
 	logger.Configure(cfg.Log.Level)
 
-	if _, err := os.ReadFile(cfg.Auth.SecretFile); err != nil && err != os.ErrNotExist {
-		randomSecret := uuid.New().String()
-		if writeErr := os.WriteFile(cfg.Auth.SecretFile, []byte(randomSecret), 0600); writeErr != nil {
-			log.WithError(writeErr).Error("failed to create JWT secret file")
+	readSecret()
+}
+
+func readSecret() {
+	if _, err := os.ReadFile(cfg.Auth.SecretFile); err != nil {
+		if os.IsNotExist(err) {
+			secretDir := filepath.Dir(cfg.Auth.SecretFile)
+			if mkErr := os.MkdirAll(secretDir, 0755); mkErr != nil {
+				log.WithError(mkErr).Error("failed to create JWT secret directory")
+			} else {
+				randomSecret := uuid.New().String()
+				if writeErr := os.WriteFile(cfg.Auth.SecretFile, []byte(randomSecret), 0600); writeErr != nil {
+					log.WithError(writeErr).Error("failed to create JWT secret file")
+				} else {
+					log.Info("JWT secret file created successfully")
+				}
+			}
 		} else {
-			log.Info("JWT secret file created successfully")
+			log.WithError(err).Warn("failed to read JWT secret from file")
 		}
-	} else {
-		log.WithError(err).Warn("failed to read JWT secret from file")
 	}
 }
 
