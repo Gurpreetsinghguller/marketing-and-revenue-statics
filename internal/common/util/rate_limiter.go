@@ -2,53 +2,56 @@ package util
 
 import (
 	"sync"
-	"time"
+
+	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/common/ratelimiter"
 )
 
-type rateLimitEntry struct {
-	count     int
-	resetTime time.Time
+type RateLimiterWrapper struct {
+	limitermu      sync.Mutex
+	limiterEntries map[string]ratelimiter.RateLimiter
 }
 
-// FixedWindowRateLimiter is an in-memory fixed-window rate limiter.
-type FixedWindowRateLimiter struct {
-	maxRequests int
-	window      time.Duration
-	entries     map[string]*rateLimitEntry
-	mu          sync.Mutex
-}
-
-func NewFixedWindowRateLimiter(maxRequests int, window time.Duration) *FixedWindowRateLimiter {
-	return &FixedWindowRateLimiter{
-		maxRequests: maxRequests,
-		window:      window,
-		entries:     make(map[string]*rateLimitEntry),
+func NewRateLimiterWrapper() *RateLimiterWrapper {
+	return &RateLimiterWrapper{
+		limitermu:      sync.Mutex{},
+		limiterEntries: make(map[string]ratelimiter.RateLimiter),
 	}
 }
 
-// Allow reports whether a request for identifier should be allowed.
-// When blocked, retryAfter is the number of seconds until reset.
-func (r *FixedWindowRateLimiter) Allow(identifier string, now time.Time) (allowed bool, retryAfter int) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+func (rw *RateLimiterWrapper) Allow(identifer string) bool {
+	rw.limitermu.Lock()
+	defer rw.limitermu.Unlock()
 
-	entry, exists := r.entries[identifier]
-	if !exists || now.After(entry.resetTime) {
-		r.entries[identifier] = &rateLimitEntry{
-			count:     1,
-			resetTime: now.Add(r.window),
-		}
-		return true, 0
+	limiter, exist := rw.limiterEntries[identifer]
+	if !exist {
+		limiter = ratelimiter.RateLimiterFactory()
+		rw.limiterEntries[identifer] = limiter
+	}
+	return limiter.Allow()
+}
+
+// -----------------------------------Advance version of above wrapper
+// Wrapper that provides per-identifier limiting using a factory
+type IdentifierRateLimiter struct {
+	factory  func() ratelimiter.RateLimiter // Creates new limiter for each identifier
+	limiters sync.Map                       // map[identifier]RateLimiter
+}
+
+func NewIdentifierRateLimiter(factory func() ratelimiter.RateLimiter) *IdentifierRateLimiter {
+	return &IdentifierRateLimiter{
+		factory: factory,
+	}
+}
+
+// This is a proxy method that calls the Allow method of actual limiter
+func (l *IdentifierRateLimiter) Allow(identifier string) bool {
+	// Get or create limiter for this identifier
+	limiter, loaded := l.limiters.LoadOrStore(identifier, l.factory())
+	if loaded {
+		// log here that existing limiter is being used for this identifier
 	}
 
-	if entry.count >= r.maxRequests {
-		retry := int(entry.resetTime.Sub(now).Seconds())
-		if retry < 1 {
-			retry = 1
-		}
-		return false, retry
-	}
-
-	entry.count++
-	return true, 0
+	// Type assert to RateLimiter
+	rl := limiter.(ratelimiter.RateLimiter)
+	return rl.Allow()
 }

@@ -9,6 +9,8 @@ import (
 
 const DefaultConfigPath = "config/config.yml"
 
+var config *Config
+
 type Config struct {
 	Server    ServerConfig    `yaml:"server"`
 	Log       LogConfig       `yaml:"log"`
@@ -31,8 +33,9 @@ type AuthConfig struct {
 }
 
 type RateLimitConfig struct {
-	MaxRequests   int `yaml:"max_requests"`
-	WindowSeconds int `yaml:"window_seconds"`
+	RateLimiterType string `yaml:"limiter_type"` // e.g., "fixedwindow"
+	MaxRequests     int    `yaml:"max_requests"`
+	WindowSeconds   int    `yaml:"window_seconds"`
 }
 
 type BrokerConfig struct {
@@ -44,24 +47,29 @@ type BrokerConfig struct {
 }
 
 func Default() *Config {
-	return &Config{
-		Server: ServerConfig{Port: "8080"},
-		Log:    LogConfig{Level: "info"},
-		Auth: AuthConfig{
-			SecretFile: "shared/secret",
-			TokenTTL:   "24h"},
-		RateLimit: RateLimitConfig{
-			MaxRequests:   100,
-			WindowSeconds: 60,
-		},
-		Broker: BrokerConfig{
-			Type:     "mqtt",
-			URL:      "tcp://localhost:1883",
-			ClientID: "marketing-app",
-			Topic:    "events",
-			QoS:      1,
-		},
+	if config == nil {
+		config = &Config{
+			Server: ServerConfig{Port: "8080"},
+			Log:    LogConfig{Level: "info"},
+			Auth: AuthConfig{
+				SecretFile: "shared/secret",
+				TokenTTL:   "24h"},
+			RateLimit: RateLimitConfig{
+				RateLimiterType: "fixedwindow",
+				MaxRequests:     100,
+				WindowSeconds:   60,
+			},
+			Broker: BrokerConfig{
+				Type:     "mqtt",
+				URL:      "tcp://localhost:1883",
+				ClientID: "marketing-app",
+				Topic:    "events",
+				QoS:      1,
+			},
+		}
 	}
+
+	return config
 }
 
 func Load(path string) (*Config, error) {
@@ -92,6 +100,9 @@ func Load(path string) (*Config, error) {
 	if strings.TrimSpace(cfg.Auth.SecretFile) == "" {
 		cfg.Auth.SecretFile = "shared/secret"
 	}
+	if strings.TrimSpace(cfg.RateLimit.RateLimiterType) != "" {
+		cfg.RateLimit.RateLimiterType = strings.ToLower(cfg.RateLimit.RateLimiterType)
+	}
 	if cfg.RateLimit.MaxRequests <= 0 {
 		cfg.RateLimit.MaxRequests = 100
 	}
@@ -111,5 +122,10 @@ func Load(path string) (*Config, error) {
 		cfg.Broker.Topic = "events"
 	}
 
-	return cfg, nil
+	config = cfg
+	return config, nil
+}
+
+func GetConfig() Config {
+	return *config
 }

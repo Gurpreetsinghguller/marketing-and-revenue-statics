@@ -3,13 +3,13 @@ package middleware
 import (
 	"context"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/common/config"
 	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/common/logger"
+	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/common/ratelimiter"
 	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/common/util"
 	"github.com/Gurpreetsinghguller/marketing-and-revenue-statics/internal/tokenmachine"
 )
@@ -94,9 +94,8 @@ func RoleMiddleware(allowedRoles ...string) func(next http.Handler) http.Handler
 
 // RateLimitMiddleware applies rate limiting
 func RateLimitMiddleware(next http.Handler) http.Handler {
-	cfg := getAppConfig()
-	limiter := util.NewFixedWindowRateLimiter(cfg.RateLimit.MaxRequests, time.Duration(cfg.RateLimit.WindowSeconds)*time.Second)
-
+	// limiter := util.NewRateLimiterWrapper()
+	limiter := util.NewIdentifierRateLimiter(ratelimiter.RateLimiterFactory)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Get identifier (user ID or IP)
 		identifier := r.Header.Get("X-User-ID")
@@ -104,14 +103,13 @@ func RateLimitMiddleware(next http.Handler) http.Handler {
 			identifier = getClientIP(r)
 		}
 
-		allowed, retryAfter := limiter.Allow(identifier, time.Now())
+		allowed := limiter.Allow(identifier)
 		if !allowed {
-			w.Header().Set("Retry-After", strconv.Itoa(retryAfter))
+
 			middlewareLog.WithFields(map[string]interface{}{
-				"identifier":  identifier,
-				"retry_after": retryAfter,
-				"path":        r.URL.Path,
-				"method":      r.Method,
+				"identifier": identifier,
+				"path":       r.URL.Path,
+				"method":     r.Method,
 			}).Warn("rate limit exceeded")
 			http.Error(w, `{"error": "Rate limit exceeded"}`, http.StatusTooManyRequests)
 			return

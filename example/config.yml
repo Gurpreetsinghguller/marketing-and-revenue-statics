@@ -9,6 +9,7 @@ auth:
   token_ttl: 24h
 
 rate_limit:
+  limiter_type: "fixed_window"
   max_requests: 100
   window_seconds: 60
 
